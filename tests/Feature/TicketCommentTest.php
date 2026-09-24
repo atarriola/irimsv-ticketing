@@ -25,6 +25,7 @@ test(':role can send a message on a ticket and receives it back', function (stri
         ->assertCreated()
         ->assertJsonPath('comment.body', 'Any update on this?')
         ->assertJsonPath('comment.author', $actor->name)
+        ->assertJsonPath('comment.author_position', $actor->usertype->type_name)
         ->assertJsonPath('comment.author_is_admin', $actor->isAdmin())
         ->assertJsonPath('comment.is_mine', true)
         ->assertJsonPath('comment.sent_on', 'Today')

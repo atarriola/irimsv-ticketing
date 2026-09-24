@@ -34,7 +34,7 @@ class AppServiceProvider extends ServiceProvider
      */
     private function configureDefaults(): void
     {
-        DB::prohibitDestructiveCommands($this->app->isProduction());
+        DB::prohibitDestructiveCommands(! $this->app->environment('testing'));
 
         Model::preventLazyLoading(! $this->app->isProduction());
 

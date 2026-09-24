@@ -275,7 +275,10 @@ const idleSegmentClasses = 'bg-white text-gray-600 hover:bg-gray-50 hover:text-g
                             <td class="px-2 py-2.5">
                                 <span class="flex items-center gap-1.5 whitespace-nowrap capitalize"><PriorityIcon :priority="ticket.priority" aria-hidden="true" /> {{ ticket.priority }}</span>
                             </td>
-                            <td v-if="user.is_admin" class="px-2 py-2.5 whitespace-nowrap text-gray-600 dark:text-gray-400">{{ ticket.requester }}</td>
+                            <td v-if="user.is_admin" class="px-2 py-2.5 whitespace-nowrap text-gray-600 dark:text-gray-400">
+                                <span class="block">{{ ticket.requester }}</span>
+                                <span class="block text-xs text-gray-500 dark:text-gray-500">{{ ticket.requester_position }}</span>
+                            </td>
                             <td class="py-2.5 pr-4 pl-2 whitespace-nowrap text-gray-600 dark:text-gray-400">{{ ticket.created_at }}</td>
                         </tr>
                     </tbody>

@@ -162,7 +162,7 @@ onBeforeUnmount(() => document.removeEventListener('click', closeUserMenuOnOutsi
                         <UserAvatar :name="user.name" :is-admin="user.is_admin" small />
                         <span class="hidden min-w-0 flex-col text-left md:flex">
                             <span class="max-w-40 truncate text-sm leading-tight font-medium">{{ user.name }}</span>
-                            <span class="text-xs leading-tight text-gray-500 dark:text-gray-400">{{ user.is_admin ? 'Administrator' : 'Member' }}</span>
+                            <span class="max-w-40 truncate text-xs leading-tight text-gray-500 dark:text-gray-400">{{ user.position }}</span>
                         </span>
                         <AppIcon name="chevron-down" class="size-4 text-gray-500" />
                     </button>
@@ -174,7 +174,9 @@ onBeforeUnmount(() => document.removeEventListener('click', closeUserMenuOnOutsi
                     >
                         <p class="flex flex-col border-b border-gray-100 px-3 pt-1.5 pb-2.5 dark:border-gray-700">
                             <span class="truncate text-sm font-medium">{{ user.name }}</span>
+                            <span class="truncate text-xs text-gray-500 dark:text-gray-400">{{ user.position }}</span>
                             <span class="truncate text-xs text-gray-500 dark:text-gray-400">{{ user.email }}</span>
+                            <span v-if="user.is_admin" class="mt-1 w-fit rounded bg-gray-100 px-1.5 py-0.5 text-xs font-medium text-gray-700 dark:bg-gray-700 dark:text-gray-200">Helpdesk administrator</span>
                         </p>
                         <Link
                             href="/account"

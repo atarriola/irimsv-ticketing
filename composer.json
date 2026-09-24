@@ -10,11 +10,6 @@
     "license": "MIT",
     "require": {
         "php": "^8.3",
-        "ext-dom": "*",
-        "ext-xml": "*",
-        "ext-mbstring": "*",
-        "ext-pdo_pgsql": "*",
-        "laravel/framework": "...",
         "inertiajs/inertia-laravel": "^3.3",
         "laravel/framework": "^13.17",
         "laravel/tinker": "^3.0"

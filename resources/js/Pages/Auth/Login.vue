@@ -6,11 +6,11 @@ import AuthLayout from '@/Layouts/AuthLayout.vue';
 </script>
 
 <template>
-    <AuthLayout title="Sign in to your account">
+    <AuthLayout title="Sign in with your LRMIS account">
         <Head title="Log in" />
 
         <Form action="/login" method="post" :reset-on-error="['password']" class="flex flex-col gap-5" #default="{ errors, processing }">
-            <FormField id="email" name="email" type="email" label="Email address" autocomplete="username" placeholder="you@example.com" :error="errors.email" required autofocus />
+            <FormField id="username" name="username" label="LRMIS username" autocomplete="username" placeholder="your.username" :error="errors.username" required autofocus />
 
             <FormField id="password" name="password" type="password" label="Password" autocomplete="current-password" :error="errors.password" required />
 

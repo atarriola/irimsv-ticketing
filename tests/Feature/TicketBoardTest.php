@@ -11,7 +11,7 @@ use Inertia\Testing\AssertableInertia as Assert;
 uses(RefreshDatabase::class);
 
 test('tickets open on a board with one column per status', function () {
-    $admin = User::factory()->admin()->create(['name' => 'System Admin']);
+    $admin = User::factory()->admin()->create(['firstname' => 'System', 'lastname' => 'Admin']);
     $open = Ticket::factory()->create(['type' => TicketType::BugReport, 'subject' => 'Login fails']);
     $inProgress = Ticket::factory()->inProgress()->create(['type' => TicketType::Problem]);
     TicketComment::factory(2)->for($inProgress)->create();

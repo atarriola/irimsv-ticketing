@@ -3,6 +3,7 @@
 use App\Models\ForumReply;
 use App\Models\ForumThread;
 use App\Models\User;
+use App\Models\Usertype;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -16,7 +17,7 @@ test('a guest cannot comment', function () {
 });
 
 test('a user can comment on a thread and the thread becomes the most recently active', function () {
-    $user = User::factory()->create(['name' => 'Maria Santos']);
+    $user = User::factory()->for(Usertype::factory()->create(['type_name' => 'Teacher']))->create(['firstname' => 'Maria', 'lastname' => 'Santos']);
     $thread = ForumThread::factory()->create(['last_activity_at' => now()->subWeek()]);
 
     $this->actingAs($user)
@@ -24,6 +25,7 @@ test('a user can comment on a thread and the thread becomes the most recently ac
         ->assertCreated()
         ->assertJsonPath('reply.body', 'Have you tried clearing the cache?')
         ->assertJsonPath('reply.author', 'Maria Santos')
+        ->assertJsonPath('reply.author_position', 'Teacher')
         ->assertJsonPath('reply.parent_id', null)
         ->assertJsonPath('reply.children', [])
         ->assertJsonPath('reply.can.delete', true)

@@ -48,7 +48,7 @@ function deleteThread() {
                             <span class="font-semibold">{{ thread.author }}</span>
                             <span v-if="thread.author_is_admin" class="rounded bg-gray-100 px-1.5 py-0.5 text-xs font-medium text-gray-700 dark:bg-gray-800 dark:text-gray-300">Admin</span>
                         </span>
-                        <span class="text-xs text-gray-500 dark:text-gray-400">{{ thread.created_at }}</span>
+                        <span class="text-xs text-gray-500 dark:text-gray-400">{{ thread.author_position }} &middot; {{ thread.created_at }}</span>
                     </div>
                 </header>
 

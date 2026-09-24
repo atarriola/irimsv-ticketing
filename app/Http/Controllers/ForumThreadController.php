@@ -11,6 +11,7 @@ use App\Http\Resources\ForumThreadResource;
 use App\Models\ForumReply;
 use App\Models\ForumThread;
 use App\Models\ForumTopic;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -37,7 +38,7 @@ class ForumThreadController extends Controller
             'threads' => Inertia::scroll(fn () => ForumThread::query()
                 ->when($topic, fn ($query) => $query->whereBelongsTo($topic, 'topic'))
                 ->with([
-                    'author:id,name,role',
+                    'author:'.User::DISPLAY_COLUMNS,
                     'topic:id,name,slug',
                     'reactions',
                     ...array_map(fn (string $relation): string => "previewComments.{$relation}", ForumThread::COMMENT_RELATIONS),
@@ -72,7 +73,7 @@ class ForumThreadController extends Controller
     {
         Gate::authorize('view', $thread);
 
-        $thread->load(['topic:id,name,slug', 'author:id,name,role', 'reactions'])->loadCount(['replies', 'comments']);
+        $thread->load(['topic:id,name,slug', 'author:'.User::DISPLAY_COLUMNS, 'reactions'])->loadCount(['replies', 'comments']);
 
         $comments = $thread->comments()
             ->with(ForumThread::COMMENT_RELATIONS)

@@ -23,8 +23,9 @@ const tagClasses = 'rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600 d
         <div class="flex min-w-0 flex-1 flex-col gap-1.5">
             <header class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
                 <span class="font-semibold">{{ thread.author }}</span>
+                <span class="text-gray-500 dark:text-gray-400">{{ thread.author_position }}</span>
                 <span v-if="thread.author_is_admin" class="rounded bg-gray-100 px-1.5 py-0.5 text-xs font-medium text-gray-700 dark:bg-gray-800 dark:text-gray-300">Admin</span>
-                <span class="text-gray-500 dark:text-gray-400">{{ thread.created_at }}</span>
+                <span class="text-gray-500 dark:text-gray-400">&middot; {{ thread.created_at }}</span>
             </header>
 
             <Link :href="`/forum/threads/${thread.id}`" prefetch class="line-clamp-6 text-sm leading-relaxed break-words whitespace-pre-line text-gray-800 dark:text-gray-200">

@@ -2,8 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\UpdateAccountRequest;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -11,24 +9,21 @@ use Inertia\Response;
 class AccountController extends Controller
 {
     /**
-     * Display the signed-in user's account settings.
+     * Display the signed-in user's LRMIS account details.
      */
-    public function edit(Request $request): Response
+    public function __invoke(Request $request): Response
     {
-        return Inertia::render('Account/Edit', [
-            'account' => $request->user()->only(['name', 'email']),
+        $user = $request->user()->load('usertype:id,type_name');
+
+        return Inertia::render('Account/Show', [
+            'account' => [
+                'name' => $user->name,
+                'username' => $user->username,
+                'email' => $user->email,
+                'contact_number' => $user->contact_number,
+                'position' => $user->usertype->type_name,
+                'status' => $user->status->label(),
+            ],
         ]);
-    }
-
-    /**
-     * Update the signed-in user's name and email address.
-     */
-    public function update(UpdateAccountRequest $request): RedirectResponse
-    {
-        $request->user()->update($request->validated());
-
-        Inertia::flash('toast', ['type' => 'success', 'message' => 'Your details have been updated.']);
-
-        return redirect()->route('account.edit');
     }
 }

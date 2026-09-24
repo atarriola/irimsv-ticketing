@@ -128,7 +128,7 @@ const panelLinkClasses = 'text-sm font-medium text-gray-900 underline decoration
                     <div class="flex min-w-0 flex-col gap-0.5">
                         <Link :href="`/forum/threads/${thread.id}`" class="truncate text-sm font-medium underline-offset-4 hover:underline">{{ thread.excerpt }}</Link>
                         <span class="flex flex-wrap items-center gap-x-1.5 text-xs text-gray-500 dark:text-gray-400">
-                            {{ thread.author }} &middot; {{ thread.topic.name }} &middot;
+                            {{ thread.author }} &middot; {{ thread.author_position }} &middot; {{ thread.topic.name }} &middot;
                             <span class="flex items-center gap-1"><AppIcon name="comment" class="size-3.5" /> {{ thread.replies_count }}</span>
                             &middot; {{ thread.created_at }}
                         </span>

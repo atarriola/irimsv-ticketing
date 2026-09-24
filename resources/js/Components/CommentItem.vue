@@ -72,6 +72,7 @@ function deleteComment() {
             <div class="w-fit max-w-full rounded-2xl bg-gray-100 px-3.5 py-2 dark:bg-gray-800">
                 <span class="flex flex-wrap items-center gap-2 text-sm font-semibold">
                     {{ comment.author }}
+                    <span class="text-xs font-normal text-gray-500 dark:text-gray-400">{{ comment.author_position }}</span>
                     <span v-if="comment.author_is_admin" class="rounded bg-gray-100 px-1.5 py-0.5 text-xs font-medium text-gray-700 dark:bg-gray-800 dark:text-gray-300">Admin</span>
                 </span>
                 <p class="text-sm leading-relaxed break-words whitespace-pre-line text-gray-800 dark:text-gray-200">{{ comment.body }}</p>

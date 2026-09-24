@@ -48,7 +48,7 @@ class TicketController extends Controller
             ->whereIn('type', $group->types())
             ->when($priority, fn (Builder $query) => $query->where('priority', $priority))
             ->when($search !== '', fn (Builder $query) => $query->search($search))
-            ->with(['requester:id,name', 'category:id,name'])
+            ->with(['requester:'.User::DISPLAY_COLUMNS, 'category:id,name'])
             ->withCount('comments');
 
         return Inertia::render('Tickets/Index', [
@@ -142,10 +142,10 @@ class TicketController extends Controller
         Gate::authorize('view', $ticket);
 
         $user = $request->user();
-        $ticket->load(['requester:id,name,email', 'category:id,name']);
+        $ticket->load(['requester:'.User::DISPLAY_COLUMNS.',email', 'category:id,name']);
 
         $comments = $ticket->comments()
-            ->with('author:id,name,role')
+            ->with('author:'.User::DISPLAY_COLUMNS)
             ->oldest()
             ->oldest('id')
             ->get()
@@ -163,7 +163,7 @@ class TicketController extends Controller
                 'status' => $ticket->status->value,
                 'priority' => $ticket->priority->value,
                 'category' => $ticket->category?->name,
-                'requester' => $ticket->requester->only(['name', 'email']),
+                'requester' => $ticket->requester->only(['name', 'position', 'email']),
                 'created_at' => $ticket->created_at->toDayDateTimeString(),
                 'updated_at' => $ticket->updated_at->diffForHumans(),
                 'resolved_at' => $ticket->resolved_at?->toDayDateTimeString(),

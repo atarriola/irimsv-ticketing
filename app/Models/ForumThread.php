@@ -37,9 +37,9 @@ class ForumThread extends Model
      * @var list<string>
      */
     public const array COMMENT_RELATIONS = [
-        'author:id,name,role',
+        'author:'.User::DISPLAY_COLUMNS,
         'reactions',
-        'children.author:id,name,role',
+        'children.author:'.User::DISPLAY_COLUMNS,
         'children.reactions',
     ];
 

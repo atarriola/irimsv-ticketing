@@ -46,7 +46,7 @@ class HandleInertiaRequests extends Middleware
     /**
      * Get the signed-in user's details that are safe to expose to the client.
      *
-     * @return array{id: int, name: string, email: string, is_admin: bool}|null
+     * @return array{id: string, name: string, email: string, position: string, is_admin: bool}|null
      */
     private function authenticatedUser(Request $request): ?array
     {
@@ -60,6 +60,7 @@ class HandleInertiaRequests extends Middleware
             'id' => $user->id,
             'name' => $user->name,
             'email' => $user->email,
+            'position' => $user->position,
             'is_admin' => $user->isAdmin(),
         ];
     }

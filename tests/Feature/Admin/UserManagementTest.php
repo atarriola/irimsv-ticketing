@@ -1,49 +1,35 @@
 <?php
 
-use App\Enums\UserRole;
 use App\Models\Ticket;
 use App\Models\User;
+use App\Models\Usertype;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
 
 uses(RefreshDatabase::class);
-
-/**
- * Build a valid account payload, optionally overriding fields.
- *
- * @param  array<string, mixed>  $overrides
- * @return array<string, mixed>
- */
-function accountPayload(array $overrides = []): array
-{
-    return [
-        'name' => 'Aiko Tanaka',
-        'email' => 'aiko@example.com',
-        'role' => 'user',
-        'password' => 'correct-horse-battery',
-        'password_confirmation' => 'correct-horse-battery',
-        ...$overrides,
-    ];
-}
 
 test('a guest is sent to the login page when opening user management', function () {
     $this->get(route('admin.users.index'))->assertRedirect(route('login'));
 });
 
 test('a regular user cannot reach user management', function (string $method, string $url) {
-    $this->actingAs(User::factory()->create())->{$method}($url, accountPayload())->assertForbidden();
+    $account = User::factory()->create();
 
-    expect(User::where('email', 'aiko@example.com')->exists())->toBeFalse();
+    $this->actingAs(User::factory()->create())
+        ->{$method}(str_replace('{user}', $account->id, $url), ['role' => 'admin'])
+        ->assertForbidden();
+
+    expect($account->fresh()->isAdmin())->toBeFalse();
 })->with([
     'list' => ['get', '/admin/users'],
-    'form' => ['get', '/admin/users/create'],
-    'creation' => ['post', '/admin/users'],
+    'role change' => ['patch', '/admin/users/{user}/role'],
 ]);
 
-test('an admin sees the accounts with their ticket counts', function () {
-    $admin = User::factory()->admin()->create(['name' => 'Zed Admin']);
-    $member = User::factory()->create(['name' => 'Amy Member']);
+test('an admin sees the LRMIS accounts with their position, status, role and ticket count', function () {
+    $admin = User::factory()->admin()->create(['firstname' => 'Zed', 'lastname' => 'Young']);
+    $teacher = Usertype::factory()->create(['type_name' => 'Teacher']);
+    $member = User::factory()->for($teacher)->deactivated()->create(['firstname' => 'Amy', 'lastname' => 'Brown', 'username' => 'amy.brown']);
     Ticket::factory(2)->for($member, 'requester')->create();
 
     $this->actingAs($admin)
@@ -51,107 +37,87 @@ test('an admin sees the accounts with their ticket counts', function () {
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->component('Admin/Users/Index')
+            ->where('filters.q', '')
             ->has('users.data', 2)
-            ->where('users.data.0.name', 'Amy Member')
+            ->where('users.data.0.name', 'Amy Brown')
+            ->where('users.data.0.username', 'amy.brown')
+            ->where('users.data.0.position', 'Teacher')
+            ->where('users.data.0.status', 'Deactivated')
+            ->where('users.data.0.is_active', false)
+            ->where('users.data.0.is_admin', false)
             ->where('users.data.0.tickets_count', 2)
-            ->where('users.data.0.can.delete', true)
-            ->where('users.data.1.name', 'Zed Admin')
+            ->where('users.data.0.can.changeRole', true)
+            ->where('users.data.1.name', 'Zed Young')
             ->where('users.data.1.is_admin', true)
-            ->where('users.data.1.can.delete', false)
+            ->where('users.data.1.can.changeRole', false)
             ->missing('users.data.0.password'));
 });
 
-test('an admin can create an account that can then sign in', function (string $role, UserRole $expectedRole) {
-    $response = $this->actingAs(User::factory()->admin()->create())
-        ->post(route('admin.users.store'), accountPayload(['role' => $role]));
+test('an admin can search the accounts', function (string $term) {
+    $match = User::factory()->create(['firstname' => 'Maria', 'lastname' => 'Santos', 'username' => 'msantos01', 'email' => 'maria.santos@deped.gov.ph']);
+    User::factory()->create(['firstname' => 'Juan', 'lastname' => 'Cruz', 'username' => 'jcruz', 'email' => 'juan.cruz@deped.gov.ph']);
+    $admin = User::factory()->admin()->create(['firstname' => 'Ada', 'lastname' => 'Admin', 'username' => 'ada.admin', 'email' => 'ada@example.com']);
 
-    $response->assertRedirect(route('admin.users.index'))->assertInertiaFlash('toast.type', 'success');
-
-    $user = User::firstWhere('email', 'aiko@example.com');
-
-    expect($user->role)->toBe($expectedRole);
-    expect(Hash::check('correct-horse-battery', $user->password))->toBeTrue();
+    $this->actingAs($admin)
+        ->get(route('admin.users.index', ['q' => $term]))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('filters.q', $term)
+            ->has('users.data', 1)
+            ->where('users.data.0.id', $match->id));
 })->with([
-    'member' => ['user', UserRole::User],
-    'administrator' => ['admin', UserRole::Admin],
+    'by surname' => 'santos',
+    'by username in any case' => 'MSANTOS',
+    'by email' => 'maria.santos@',
 ]);
 
-test('creating an account validates its details', function () {
-    User::factory()->create(['email' => 'aiko@example.com']);
+test('an admin can make an account an administrator', function () {
+    $account = User::factory()->create(['firstname' => 'Amy', 'lastname' => 'Brown']);
 
-    $response = $this->actingAs(User::factory()->admin()->create())
-        ->post(route('admin.users.store'), accountPayload(['name' => '', 'role' => 'owner', 'password_confirmation' => 'different']));
+    $this->actingAs(User::factory()->admin()->create())
+        ->from(route('admin.users.index'))
+        ->patch(route('admin.users.role.update', $account), ['role' => 'admin'])
+        ->assertRedirect(route('admin.users.index'))
+        ->assertInertiaFlash('toast.message', 'Amy Brown is now an administrator.');
 
-    $response->assertSessionHasErrors([
-        'name' => 'The name field is required.',
-        'email' => 'The email has already been taken.',
-        'role' => 'The selected role is invalid.',
-        'password' => 'The password field confirmation does not match.',
-    ]);
+    $this->assertDatabaseHas('user_roles', ['user_id' => $account->id, 'role' => 'admin']);
+    expect($account->fresh()->isAdmin())->toBeTrue();
 });
 
-test('an admin can update an account and promote it without touching its password', function () {
-    $account = User::factory()->create();
-    $originalPassword = $account->password;
+test('an admin can make an administrator a member again', function () {
+    $account = User::factory()->admin()->create(['firstname' => 'Amy', 'lastname' => 'Brown']);
 
-    $response = $this->actingAs(User::factory()->admin()->create())->put(route('admin.users.update', $account), [
-        'name' => 'Renamed User',
-        'email' => 'renamed@example.com',
-        'role' => 'admin',
-        'password' => '',
-        'password_confirmation' => '',
-    ]);
+    $this->actingAs(User::factory()->admin()->create())
+        ->from(route('admin.users.index'))
+        ->patch(route('admin.users.role.update', $account), ['role' => 'user'])
+        ->assertRedirect(route('admin.users.index'))
+        ->assertInertiaFlash('toast.message', 'Amy Brown is now a member.');
 
-    $response->assertRedirect(route('admin.users.index'));
-
-    $account->refresh();
-
-    expect($account->name)->toBe('Renamed User');
-    expect($account->email)->toBe('renamed@example.com');
-    expect($account->isAdmin())->toBeTrue();
-    expect($account->password)->toBe($originalPassword);
+    $this->assertDatabaseHas('user_roles', ['user_id' => $account->id, 'role' => 'user']);
+    expect($account->fresh()->isAdmin())->toBeFalse();
 });
 
-test('an admin can reset an account password', function () {
-    $account = User::factory()->create();
-
-    $this->actingAs(User::factory()->admin()->create())->put(route('admin.users.update', $account), [
-        'name' => $account->name,
-        'email' => $account->email,
-        'role' => 'user',
-        'password' => 'a-brand-new-password',
-        'password_confirmation' => 'a-brand-new-password',
-    ]);
-
-    expect(Hash::check('a-brand-new-password', $account->fresh()->password))->toBeTrue();
-});
-
-test('an admin cannot demote themselves', function () {
+test('an admin cannot change their own role', function () {
     $admin = User::factory()->admin()->create();
 
     $this->actingAs($admin)
-        ->put(route('admin.users.update', $admin), ['name' => $admin->name, 'email' => $admin->email, 'role' => 'user'])
-        ->assertSessionHasErrors(['role' => 'You cannot change your own role.']);
+        ->patch(route('admin.users.role.update', $admin), ['role' => 'user'])
+        ->assertForbidden();
 
     expect($admin->fresh()->isAdmin())->toBeTrue();
 });
 
-test('an admin can delete another account but not their own', function () {
-    $admin = User::factory()->admin()->create();
+test('the role must be a known helpdesk role', function () {
     $account = User::factory()->create();
 
-    $this->actingAs($admin)->delete(route('admin.users.destroy', $account))->assertRedirect(route('admin.users.index'));
-    $this->actingAs($admin)->delete(route('admin.users.destroy', $admin))->assertForbidden();
+    $this->actingAs(User::factory()->admin()->create())
+        ->patch(route('admin.users.role.update', $account), ['role' => 'owner'])
+        ->assertSessionHasErrors(['role' => 'The selected role is invalid.']);
 
-    expect(User::pluck('id')->all())->toBe([$admin->id]);
+    expect($account->fresh()->isAdmin())->toBeFalse();
 });
 
-test('a regular user cannot update or delete an account', function (string $method) {
-    $account = User::factory()->create(['name' => 'Original Name']);
-
-    $this->actingAs(User::factory()->create())
-        ->{$method}("/admin/users/{$account->id}", ['name' => 'Hijacked', 'email' => $account->email, 'role' => 'admin'])
-        ->assertForbidden();
-
-    expect($account->fresh()->name)->toBe('Original Name');
-})->with(['put', 'delete']);
+test('a role change for an unknown account is not found', function () {
+    $this->actingAs(User::factory()->admin()->create())
+        ->patch('/admin/users/'.Str::uuid().'/role', ['role' => 'admin'])
+        ->assertNotFound();
+});

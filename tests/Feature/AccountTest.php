@@ -1,84 +1,49 @@
 <?php
 
 use App\Models\User;
+use App\Models\Usertype;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Hash;
 use Inertia\Testing\AssertableInertia as Assert;
 
 uses(RefreshDatabase::class);
 
 test('a guest is sent to the login page when opening account settings', function () {
-    $this->get(route('account.edit'))->assertRedirect(route('login'));
+    $this->get(route('account.show'))->assertRedirect(route('login'));
 });
 
-test('a user sees their own details on the account page', function () {
-    $user = User::factory()->create(['name' => 'Maria Santos', 'email' => 'maria@example.com']);
+test('a user sees their LRMIS details on the account page', function () {
+    $usertype = Usertype::factory()->create(['type_name' => 'School Librarian (Designated)']);
+    $user = User::factory()->for($usertype)->create([
+        'firstname' => 'Maria',
+        'lastname' => 'Santos',
+        'username' => 'maria.santos',
+        'email' => 'maria@example.com',
+        'contact_number' => '09171234567',
+    ]);
 
     $this->actingAs($user)
-        ->get(route('account.edit'))
+        ->get(route('account.show'))
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
-            ->component('Account/Edit')
-            ->where('account', ['name' => 'Maria Santos', 'email' => 'maria@example.com']));
+            ->component('Account/Show')
+            ->where('account', [
+                'name' => 'Maria Santos',
+                'username' => 'maria.santos',
+                'email' => 'maria@example.com',
+                'contact_number' => '09171234567',
+                'position' => 'School Librarian (Designated)',
+                'status' => 'Active',
+            ]));
 });
 
-test('a user can update their name and email but not their role', function () {
-    $user = User::factory()->create();
-
-    $this->actingAs($user)
-        ->patch(route('account.update'), ['name' => 'New Name', 'email' => 'new@example.com', 'role' => 'admin'])
-        ->assertRedirect(route('account.edit'))
-        ->assertInertiaFlash('toast.type', 'success');
-
-    $user->refresh();
-
-    expect($user->name)->toBe('New Name');
-    expect($user->email)->toBe('new@example.com');
-    expect($user->isAdmin())->toBeFalse();
+test('account details cannot be changed from the ticketing system', function () {
+    $this->actingAs(User::factory()->create())
+        ->patch('/account', ['firstname' => 'Changed'])
+        ->assertMethodNotAllowed();
 });
 
-test('a user cannot take an email that belongs to someone else', function () {
-    User::factory()->create(['email' => 'taken@example.com']);
-    $user = User::factory()->create(['email' => 'mine@example.com']);
-
-    $this->actingAs($user)
-        ->patch(route('account.update'), ['name' => $user->name, 'email' => 'taken@example.com'])
-        ->assertSessionHasErrors(['email' => 'The email has already been taken.']);
-
-    expect($user->fresh()->email)->toBe('mine@example.com');
+test('passwords cannot be changed from the ticketing system', function () {
+    $this->actingAs(User::factory()->create())
+        ->put('/account/password', ['current_password' => 'password', 'password' => 'new-password', 'password_confirmation' => 'new-password'])
+        ->assertNotFound();
 });
-
-test('a user can change their password with their current one', function () {
-    $user = User::factory()->create();
-
-    $this->actingAs($user)
-        ->put(route('account.password.update'), [
-            'current_password' => 'password',
-            'password' => 'a-brand-new-password',
-            'password_confirmation' => 'a-brand-new-password',
-        ])
-        ->assertRedirect(route('account.edit'));
-
-    expect(Hash::check('a-brand-new-password', $user->fresh()->password))->toBeTrue();
-});
-
-test('a password change is refused when :case', function (array $payload, string $field, string $message) {
-    $user = User::factory()->create();
-
-    $this->actingAs($user)
-        ->put(route('account.password.update'), $payload)
-        ->assertSessionHasErrors([$field => $message]);
-
-    expect(Hash::check('password', $user->fresh()->password))->toBeTrue();
-})->with([
-    'the current password is wrong' => [
-        ['current_password' => 'not-my-password', 'password' => 'a-brand-new-password', 'password_confirmation' => 'a-brand-new-password'],
-        'current_password',
-        'The password is incorrect.',
-    ],
-    'the confirmation does not match' => [
-        ['current_password' => 'password', 'password' => 'a-brand-new-password', 'password_confirmation' => 'something-else'],
-        'password',
-        'The password field confirmation does not match.',
-    ],
-]);

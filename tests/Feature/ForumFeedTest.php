@@ -4,6 +4,7 @@ use App\Models\ForumReply;
 use App\Models\ForumThread;
 use App\Models\ForumTopic;
 use App\Models\User;
+use App\Models\Usertype;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -13,9 +14,10 @@ test('a guest is sent to the login page when opening the forum', function (strin
     $this->get($url)->assertRedirect(route('login'));
 })->with(['/forum', '/forum/threads/1']);
 
-test('the feed shows every thread with its author, topic and reply count', function () {
+test('the feed shows every thread with its author, their position, topic and reply count', function () {
     $topic = ForumTopic::factory()->create(['name' => 'Help', 'slug' => 'help']);
-    $author = User::factory()->admin()->create(['name' => 'System Admin']);
+    $librarian = Usertype::factory()->create(['type_name' => 'Regional Librarian']);
+    $author = User::factory()->for($librarian)->admin()->create(['firstname' => 'System', 'lastname' => 'Admin']);
     $thread = ForumThread::factory()->for($topic, 'topic')->for($author, 'author')->create(['body' => 'The portal is back online.']);
     ForumReply::factory(2)->for($thread, 'thread')->create();
 
@@ -32,6 +34,7 @@ test('the feed shows every thread with its author, topic and reply count', funct
             ->where('threads.data.0.id', $thread->id)
             ->where('threads.data.0.body', 'The portal is back online.')
             ->where('threads.data.0.author', 'System Admin')
+            ->where('threads.data.0.author_position', 'Regional Librarian')
             ->where('threads.data.0.author_is_admin', true)
             ->where('threads.data.0.topic.slug', 'help')
             ->where('threads.data.0.replies_count', 2));

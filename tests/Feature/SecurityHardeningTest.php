@@ -26,29 +26,14 @@ test('strict transport security is only sent over https', function () {
 test('a session is signed out once its password has been changed elsewhere', function () {
     $user = User::factory()->create();
 
-    $this->post(route('login.store'), ['email' => $user->email, 'password' => 'password']);
+    $this->post(route('login.store'), ['username' => $user->username, 'password' => 'password']);
     $this->get(route('dashboard'))->assertOk();
 
-    $user->update(['password' => 'reset-by-an-administrator']);
+    $user->forceFill(['password' => 'reset-by-an-administrator'])->save();
     $this->app['auth']->forgetGuards();
 
     $this->get(route('dashboard'))->assertRedirect(route('login'));
     $this->assertGuest();
-});
-
-test('a user stays signed in on the device where they change their password', function () {
-    $user = User::factory()->create();
-
-    $this->actingAs($user)
-        ->put(route('account.password.update'), [
-            'current_password' => 'password',
-            'password' => 'a-brand-new-password',
-            'password_confirmation' => 'a-brand-new-password',
-        ])
-        ->assertRedirect(route('account.edit'));
-
-    $this->get(route('account.edit'))->assertOk();
-    $this->assertAuthenticatedAs($user);
 });
 
 test('posting is limited to sixty requests a minute for each user', function () {

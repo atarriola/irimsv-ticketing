@@ -86,17 +86,6 @@ test('an admin can comment on a ticket and new users are regular users', functio
         ->and($ticket->comments()->first()->author->is($admin))->toBeTrue();
 });
 
-test('role cannot be mass assigned', function () {
-    $user = User::create([
-        'name' => 'Mallory',
-        'email' => 'mallory@example.com',
-        'password' => 'password',
-        'role' => UserRole::Admin,
-    ]);
-
-    expect($user->fresh()->isAdmin())->toBeFalse();
-});
-
 test('a forum thread collects replies and is removed with them', function () {
     $thread = ForumThread::factory()->create();
     ForumReply::factory(3)->for($thread, 'thread')->create();
@@ -108,4 +97,21 @@ test('a forum thread collects replies and is removed with them', function () {
     $thread->delete();
 
     expect(ForumReply::count())->toBe(0);
+});
+
+test('a user is named as LRMIS displays them', function (array $attributes, string $expectedName) {
+    expect(User::factory()->create($attributes)->name)->toBe($expectedName);
+})->with([
+    'without an extension' => [['firstname' => 'Maria', 'middlename' => 'Ebdani', 'lastname' => 'Santos', 'extension_name' => null], 'Maria Santos'],
+    'with an extension' => [['firstname' => 'Jose', 'middlename' => null, 'lastname' => 'Reyes', 'extension_name' => 'Jr.'], 'Jose Reyes Jr.'],
+]);
+
+test('assigning a role replaces the one the user already has', function () {
+    $user = User::factory()->admin()->create();
+
+    $user->assignRole(UserRole::User);
+
+    expect($user->isAdmin())->toBeFalse()
+        ->and($user->fresh()->role)->toBe(UserRole::User);
+    $this->assertDatabaseCount('user_roles', 1);
 });

@@ -4,6 +4,7 @@ use App\Enums\TicketType;
 use App\Models\Ticket;
 use App\Models\TicketComment;
 use App\Models\User;
+use App\Models\Usertype;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -16,7 +17,7 @@ test('a guest is sent to the login page when opening a ticket', function () {
 });
 
 test('a requester sees their ticket, its comments in order and what they may do', function () {
-    $requester = User::factory()->create();
+    $requester = User::factory()->for(Usertype::factory()->create(['type_name' => 'School Head']))->create();
     $ticket = Ticket::factory()->for($requester, 'requester')->create(['subject' => 'Printer offline', 'type' => TicketType::Problem]);
     $adminComment = TicketComment::factory()->for($ticket)->for(User::factory()->admin(), 'author')->create(['created_at' => now()->subHour()]);
     $ownComment = TicketComment::factory()->for($ticket)->for($requester, 'author')->create();
@@ -29,6 +30,7 @@ test('a requester sees their ticket, its comments in order and what they may do'
             ->where('ticket.subject', 'Printer offline')
             ->where('ticket.group', 'issues')
             ->where('ticket.requester.name', $requester->name)
+            ->where('ticket.requester.position', 'School Head')
             ->missing('ticket.assignee')
             ->has('comments', 2)
             ->where('comments.0.id', $adminComment->id)

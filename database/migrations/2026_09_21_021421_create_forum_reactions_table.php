@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('forum_reactions', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
+            $table->foreignUuid('user_id')->constrained()->cascadeOnDelete();
             $table->foreignId('forum_thread_id')->nullable()->constrained()->cascadeOnDelete();
             $table->foreignId('forum_reply_id')->nullable()->constrained()->cascadeOnDelete();
             $table->string('type');

@@ -94,6 +94,7 @@ function deleteTicket() {
                                 <UserAvatar :name="ticket.requester.name" tiny />
                                 <span class="min-w-0">
                                     <span class="block truncate font-medium">{{ ticket.requester.name }}</span>
+                                    <span class="block truncate text-xs text-gray-500 dark:text-gray-400">{{ ticket.requester.position }}</span>
                                     <span class="block truncate text-xs text-gray-500 dark:text-gray-400">{{ ticket.requester.email }}</span>
                                 </span>
                             </dd>

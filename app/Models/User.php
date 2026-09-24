@@ -3,29 +3,41 @@
 namespace App\Models;
 
 use App\Enums\UserRole;
+use App\Enums\UserStatus;
 use Database\Factories\UserFactory;
-use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
-#[Fillable(['name', 'email', 'password'])]
+/**
+ * An LRMIS account. The users table belongs to LRMIS, so the ticketing system
+ * only reads it and keeps the helpdesk role in its own user_roles table.
+ */
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable;
+    use HasFactory, HasUuids, Notifiable;
 
     /**
-     * The model's default values for attributes.
-     *
-     * @var array<string, mixed>
+     * The columns a constrained eager load needs to display a user by name and position.
      */
-    protected $attributes = [
-        'role' => UserRole::User->value,
-    ];
+    public const string DISPLAY_COLUMNS = 'id,firstname,lastname,extension_name,usertype_id';
+
+    /**
+     * The relationships that should always be loaded.
+     *
+     * @var list<string>
+     */
+    protected $with = ['roleAssignment', 'usertype'];
 
     /**
      * Get the attributes that should be cast.
@@ -35,18 +47,107 @@ class User extends Authenticatable
     protected function casts(): array
     {
         return [
-            'email_verified_at' => 'datetime',
+            'birthday' => 'date',
             'password' => 'hashed',
-            'role' => UserRole::class,
+            'status' => UserStatus::class,
         ];
     }
 
     /**
-     * Determine whether the user is an administrator.
+     * Get the user's full name as LRMIS displays it.
+     *
+     * @return Attribute<string, never>
+     */
+    protected function name(): Attribute
+    {
+        return Attribute::get(fn (): string => collect([$this->firstname, $this->lastname, $this->extension_name])
+            ->filter()
+            ->implode(' '));
+    }
+
+    /**
+     * Get the user's position, which is their LRMIS user type such as Teacher or School Head.
+     *
+     * @return Attribute<string, never>
+     */
+    protected function position(): Attribute
+    {
+        return Attribute::get(fn (): string => $this->usertype->type_name);
+    }
+
+    /**
+     * Get the user's helpdesk role, which is a member until an administrator grants another.
+     *
+     * @return Attribute<UserRole, never>
+     */
+    protected function role(): Attribute
+    {
+        return Attribute::get(fn (): UserRole => $this->roleAssignment?->role ?? UserRole::User)->withoutObjectCaching();
+    }
+
+    /**
+     * Determine whether the user administers the helpdesk.
      */
     public function isAdmin(): bool
     {
-        return $this->role === UserRole::Admin;
+        return $this->roleAssignment?->role === UserRole::Admin;
+    }
+
+    /**
+     * Determine whether LRMIS allows the account to sign in.
+     */
+    public function isActive(): bool
+    {
+        return $this->status === UserStatus::Active;
+    }
+
+    /**
+     * Give the user a helpdesk role, replacing any they already have.
+     */
+    public function assignRole(UserRole $role): void
+    {
+        $assignment = $this->roleAssignment()->updateOrCreate([], ['role' => $role]);
+
+        $this->setRelation('roleAssignment', $assignment);
+    }
+
+    /**
+     * Scope the query to users whose name, username or email contains the term.
+     *
+     * @param  Builder<User>  $query
+     * @return Builder<User>
+     */
+    #[Scope]
+    protected function search(Builder $query, string $term): Builder
+    {
+        $pattern = '%'.addcslashes(trim($term), '%_\\').'%';
+
+        return $query->where(function (Builder $query) use ($pattern): void {
+            $query->whereLike('firstname', $pattern)
+                ->orWhereLike('lastname', $pattern)
+                ->orWhereLike('username', $pattern)
+                ->orWhereLike('email', $pattern);
+        });
+    }
+
+    /**
+     * Get the LRMIS user type, such as Teacher or School Head.
+     *
+     * @return BelongsTo<Usertype, $this>
+     */
+    public function usertype(): BelongsTo
+    {
+        return $this->belongsTo(Usertype::class);
+    }
+
+    /**
+     * Get the user's helpdesk role assignment, if an administrator has made one.
+     *
+     * @return HasOne<UserRoleAssignment, $this>
+     */
+    public function roleAssignment(): HasOne
+    {
+        return $this->hasOne(UserRoleAssignment::class);
     }
 
     /**

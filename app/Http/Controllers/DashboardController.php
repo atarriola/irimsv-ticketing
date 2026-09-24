@@ -9,6 +9,7 @@ use App\Http\Resources\ForumThreadResource;
 use App\Http\Resources\TicketResource;
 use App\Models\ForumThread;
 use App\Models\Ticket;
+use App\Models\User;
 use BackedEnum;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -63,7 +64,7 @@ class DashboardController extends Controller
     private function recentTickets(Request $request): array
     {
         return Ticket::visibleTo($request->user())
-            ->with(['requester:id,name', 'category:id,name'])
+            ->with(['requester:'.User::DISPLAY_COLUMNS, 'category:id,name'])
             ->latest()
             ->latest('id')
             ->limit(6)
@@ -80,7 +81,7 @@ class DashboardController extends Controller
     private function recentThreads(Request $request): array
     {
         return ForumThread::query()
-            ->with(['author:id,name,role', 'topic:id,name,slug'])
+            ->with(['author:'.User::DISPLAY_COLUMNS, 'topic:id,name,slug'])
             ->withCount('replies')
             ->latest()
             ->latest('id')

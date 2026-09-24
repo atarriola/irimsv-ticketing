@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('forum_thread_id')->constrained()->cascadeOnDelete();
             $table->foreignId('parent_id')->nullable()->constrained('forum_replies')->cascadeOnDelete();
-            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
+            $table->foreignUuid('user_id')->constrained()->cascadeOnDelete();
             $table->text('body');
             $table->timestamps();
 

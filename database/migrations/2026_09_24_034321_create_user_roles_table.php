@@ -8,17 +8,15 @@ return new class extends Migration
 {
     /**
      * Run the migrations.
+     *
+     * Helpdesk roles are kept apart from the LRMIS-owned users table.
      */
     public function up(): void
     {
-        Schema::create('ticket_comments', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('ticket_id')->constrained()->cascadeOnDelete();
-            $table->foreignUuid('user_id')->constrained()->cascadeOnDelete();
-            $table->text('body');
+        Schema::create('user_roles', function (Blueprint $table) {
+            $table->foreignUuid('user_id')->primary()->constrained()->cascadeOnDelete();
+            $table->string('role');
             $table->timestamps();
-
-            $table->index(['ticket_id', 'created_at']);
         });
     }
 
@@ -27,6 +25,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('ticket_comments');
+        Schema::dropIfExists('user_roles');
     }
 };

@@ -126,6 +126,7 @@ onBeforeUnmount(() => {
                     <div class="flex max-w-[80%] min-w-0 flex-col gap-1" :class="message.is_mine ? 'items-end' : 'items-start'">
                         <span class="flex items-center gap-2 px-1 text-xs text-gray-500 dark:text-gray-400">
                             <span class="font-semibold text-gray-700 dark:text-gray-300">{{ message.is_mine ? 'You' : message.author }}</span>
+                            <span>{{ message.author_position }}</span>
                             <span v-if="message.author_is_admin" class="rounded bg-gray-100 px-1.5 py-0.5 font-medium text-gray-700 dark:bg-gray-800 dark:text-gray-300">Support</span>
                         </span>
 

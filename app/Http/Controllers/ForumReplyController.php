@@ -7,6 +7,7 @@ use App\Http\Requests\UpdateForumReplyRequest;
 use App\Http\Resources\ForumReplyResource;
 use App\Models\ForumReply;
 use App\Models\ForumThread;
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -53,7 +54,7 @@ class ForumReplyController extends Controller
             return $reply;
         });
 
-        $reply->load(['author:id,name,role', 'reactions'])->setRelation('children', $reply->newCollection());
+        $reply->load(['author:'.User::DISPLAY_COLUMNS, 'reactions'])->setRelation('children', $reply->newCollection());
 
         return response()->json([
             'reply' => ForumReplyResource::make($reply)->resolve($request),

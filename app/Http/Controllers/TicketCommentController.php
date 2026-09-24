@@ -6,6 +6,7 @@ use App\Http\Requests\StoreTicketCommentRequest;
 use App\Http\Resources\TicketCommentResource;
 use App\Models\Ticket;
 use App\Models\TicketComment;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -21,7 +22,7 @@ class TicketCommentController extends Controller
         Gate::authorize('view', $ticket);
 
         $comments = $ticket->comments()
-            ->with('author:id,name,role')
+            ->with('author:'.User::DISPLAY_COLUMNS)
             ->when($request->integer('after') > 0, fn (Builder $query) => $query->where('id', '>', $request->integer('after')))
             ->oldest()
             ->oldest('id')
@@ -43,7 +44,7 @@ class TicketCommentController extends Controller
             'body' => $request->validated('body'),
         ]);
 
-        $comment->load('author:id,name,role');
+        $comment->load('author:'.User::DISPLAY_COLUMNS);
 
         return response()->json(['comment' => TicketCommentResource::make($comment)->resolve($request)], 201);
     }
