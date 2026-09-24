@@ -1,7 +1,6 @@
 <?php
 
 use App\Models\User;
-use App\Models\Usertype;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -108,13 +107,13 @@ test('a guest is sent to the login page when opening tickets', function () {
 
 test('pages receive the signed-in user with their position and photo but without sensitive fields', function () {
     config()->set('filesystems.disks.public.url', 'https://lrmis.test/storage');
-    $admin = User::factory()->for(Usertype::factory()->create(['type_name' => 'Information Technology Officer']))->admin()->create(['photo' => 'admin.jpg']);
+    $admin = User::factory()->admin()->create(['photo' => 'admin.jpg']);
 
     $this->actingAs($admin)
         ->get(route('tickets.index'))
         ->assertInertia(fn (Assert $page) => $page
             ->where('auth.user.id', $admin->id)
-            ->where('auth.user.position', 'Information Technology Officer')
+            ->where('auth.user.position', 'Administrator')
             ->where('auth.user.photo_url', 'https://lrmis.test/storage/user_pic/admin.jpg')
             ->where('auth.user.is_admin', true)
             ->missing('auth.user.password')

@@ -16,22 +16,6 @@ const search = ref(props.filters.q ?? '');
 function submitSearch() {
     router.get('/admin/users', search.value ? { q: search.value } : {}, { preserveState: true, replace: true });
 }
-
-function changeRole(user) {
-    const role = user.is_admin ? 'user' : 'admin';
-    const question = user.is_admin
-        ? `Remove ${user.name} as an administrator? They will only see their own tickets.`
-        : `Make ${user.name} an administrator? They will see and manage every ticket.`;
-
-    router.patch(
-        `/admin/users/${user.id}/role`,
-        { role },
-        {
-            preserveScroll: true,
-            onBefore: () => confirm(question),
-        },
-    );
-}
 </script>
 
 <template>
@@ -41,7 +25,7 @@ function changeRole(user) {
         <header class="flex flex-wrap items-end justify-between gap-4">
             <div class="flex flex-col gap-1">
                 <h1 class="text-2xl font-semibold tracking-tight">Users</h1>
-                <p class="text-sm text-gray-600 dark:text-gray-400">Accounts come from LRMIS. Choose who administers the helpdesk.</p>
+                <p class="text-sm text-gray-600 dark:text-gray-400">Accounts come from LRMIS. Its administrators run the helpdesk and everyone else is a member.</p>
             </div>
 
             <form class="flex w-full gap-2 sm:w-auto" role="search" @submit.prevent="submitSearch">
@@ -72,12 +56,11 @@ function changeRole(user) {
                         <th scope="col" class="px-5 py-3 font-medium">Role</th>
                         <th scope="col" class="px-5 py-3 font-medium">Tickets</th>
                         <th scope="col" class="px-5 py-3 font-medium">Joined</th>
-                        <th scope="col" class="px-5 py-3 font-medium"><span class="sr-only">Actions</span></th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                     <tr v-if="users.data.length === 0">
-                        <td colspan="7" class="px-5 py-8 text-center text-gray-500 dark:text-gray-400">No LRMIS accounts match your search.</td>
+                        <td colspan="6" class="px-5 py-8 text-center text-gray-500 dark:text-gray-400">No LRMIS accounts match your search.</td>
                     </tr>
                     <tr v-for="user in users.data" :key="user.id" class="hover:bg-gray-50 dark:hover:bg-gray-800/50">
                         <td class="w-full max-w-0 min-w-48 px-5 py-3">
@@ -102,19 +85,6 @@ function changeRole(user) {
                         </td>
                         <td class="px-5 py-3 text-gray-600 tabular-nums dark:text-gray-400">{{ user.tickets_count }}</td>
                         <td class="px-5 py-3 whitespace-nowrap text-gray-600 dark:text-gray-400">{{ user.created_at ?? '—' }}</td>
-                        <td class="px-5 py-3 whitespace-nowrap">
-                            <span class="flex justify-end text-sm font-medium">
-                                <button
-                                    v-if="user.can.changeRole"
-                                    type="button"
-                                    class="cursor-pointer text-gray-900 underline decoration-gray-300 underline-offset-4 hover:decoration-gray-900 dark:text-gray-100 dark:decoration-gray-700 dark:hover:decoration-gray-100"
-                                    @click="changeRole(user)"
-                                >
-                                    {{ user.is_admin ? 'Make member' : 'Make administrator' }}
-                                </button>
-                                <span v-else class="text-xs text-gray-500 dark:text-gray-400">You</span>
-                            </span>
-                        </td>
                     </tr>
                 </tbody>
             </table>

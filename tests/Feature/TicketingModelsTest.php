@@ -3,12 +3,12 @@
 use App\Enums\TicketPriority;
 use App\Enums\TicketStatus;
 use App\Enums\TicketType;
-use App\Enums\UserRole;
 use App\Models\ForumReply;
 use App\Models\ForumThread;
 use App\Models\Ticket;
 use App\Models\TicketComment;
 use App\Models\User;
+use App\Models\Usertype;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -75,14 +75,14 @@ test('tickets can be ordered from most to least urgent', function () {
         ->toBe([TicketPriority::Critical, TicketPriority::High, TicketPriority::Medium, TicketPriority::Low]);
 });
 
-test('an admin can comment on a ticket and new users are regular users', function () {
+test('an admin can comment on a ticket and new users are members', function () {
     $admin = User::factory()->admin()->create();
     $ticket = Ticket::factory()->inProgress()->create();
 
     TicketComment::factory()->for($ticket)->for($admin, 'author')->create();
 
     expect($admin->isAdmin())->toBeTrue()
-        ->and(User::factory()->create()->role)->toBe(UserRole::User)
+        ->and(User::factory()->create()->isAdmin())->toBeFalse()
         ->and($ticket->comments()->first()->author->is($admin))->toBeTrue();
 });
 
@@ -106,12 +106,14 @@ test('a user is named as LRMIS displays them', function (array $attributes, stri
     'with an extension' => [['firstname' => 'Jose', 'middlename' => null, 'lastname' => 'Reyes', 'extension_name' => 'Jr.'], 'Jose Reyes Jr.'],
 ]);
 
-test('assigning a role replaces the one the user already has', function () {
-    $user = User::factory()->admin()->create();
+test('only accounts of the LRMIS Administrator type administer the helpdesk', function (string $typeName, int $level, bool $administersHelpdesk) {
+    $usertype = Usertype::factory()->create(['type_name' => $typeName, 'level' => $level]);
+    $user = User::factory()->for($usertype)->create();
 
-    $user->assignRole(UserRole::User);
-
-    expect($user->isAdmin())->toBeFalse()
-        ->and($user->fresh()->role)->toBe(UserRole::User);
-    $this->assertDatabaseCount('user_roles', 1);
-});
+    expect($user->fresh()->isAdmin())->toBe($administersHelpdesk);
+})->with([
+    'the level 0 Administrator' => ['Administrator', 0, true],
+    'a level 1 Teacher' => ['Teacher', 1, false],
+    'a level 3 Information Technology Officer' => ['Information Technology Officer', 3, false],
+    'a level 4 Regional Director' => ['Regional Director', 4, false],
+]);

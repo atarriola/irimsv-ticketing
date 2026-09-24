@@ -13,7 +13,7 @@ use Inertia\Response;
 class UserController extends Controller
 {
     /**
-     * Display the LRMIS accounts with their helpdesk roles.
+     * Display the LRMIS accounts and whether each administers the helpdesk.
      */
     public function index(Request $request): Response
     {
@@ -23,7 +23,7 @@ class UserController extends Controller
 
         $users = User::query()
             ->select(['id', 'firstname', 'lastname', 'extension_name', 'username', 'email', 'status', 'usertype_id', 'created_at'])
-            ->with('usertype:id,type_name')
+            ->with('usertype:id,type_name,level')
             ->withCount('tickets')
             ->when($search !== '', fn (Builder $query) => $query->search($search))
             ->orderBy('lastname')
@@ -42,9 +42,6 @@ class UserController extends Controller
                 'is_admin' => $user->isAdmin(),
                 'tickets_count' => $user->tickets_count,
                 'created_at' => $user->created_at?->toFormattedDateString(),
-                'can' => [
-                    'changeRole' => $request->user()->can('changeRole', $user),
-                ],
             ]);
 
         return Inertia::render('Admin/Users/Index', [

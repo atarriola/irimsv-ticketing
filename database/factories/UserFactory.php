@@ -2,7 +2,6 @@
 
 namespace Database\Factories;
 
-use App\Enums\UserRole;
 use App\Enums\UserStatus;
 use App\Models\User;
 use App\Models\Usertype;
@@ -47,11 +46,11 @@ class UserFactory extends Factory
     }
 
     /**
-     * Indicate that the user administers the helpdesk.
+     * Indicate that the user is an LRMIS Administrator, who administers the helpdesk.
      */
     public function admin(): static
     {
-        return $this->afterCreating(fn (User $user) => $user->assignRole(UserRole::Admin));
+        return $this->for(Usertype::factory()->administrator());
     }
 
     /**

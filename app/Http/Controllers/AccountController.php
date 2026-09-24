@@ -13,7 +13,7 @@ class AccountController extends Controller
      */
     public function __invoke(Request $request): Response
     {
-        $user = $request->user()->load('usertype:id,type_name');
+        $user = $request->user();
 
         return Inertia::render('Account/Show', [
             'account' => [

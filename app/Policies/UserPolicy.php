@@ -13,12 +13,4 @@ class UserPolicy
     {
         return $user->isAdmin();
     }
-
-    /**
-     * Determine whether the user can change another account's helpdesk role.
-     */
-    public function changeRole(User $user, User $model): bool
-    {
-        return $user->isAdmin() && $user->isNot($model);
-    }
 }

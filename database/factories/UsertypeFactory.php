@@ -22,4 +22,15 @@ class UsertypeFactory extends Factory
             'level' => fake()->numberBetween(1, 4),
         ];
     }
+
+    /**
+     * Indicate that this is the LRMIS Administrator type.
+     */
+    public function administrator(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'type_name' => 'Administrator',
+            'level' => Usertype::ADMINISTRATOR_LEVEL,
+        ]);
+    }
 }

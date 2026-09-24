@@ -4,7 +4,6 @@ use App\Http\Controllers\AccountController;
 use App\Http\Controllers\Admin\CategoryController as AdminCategoryController;
 use App\Http\Controllers\Admin\ForumTopicController as AdminForumTopicController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
-use App\Http\Controllers\Admin\UserRoleController as AdminUserRoleController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ForumReplyController;
@@ -37,7 +36,6 @@ Route::middleware('auth')->group(function () {
 
     Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('/users', [AdminUserController::class, 'index'])->name('users.index');
-        Route::patch('/users/{user}/role', [AdminUserRoleController::class, 'update'])->whereUuid('user')->name('users.role.update');
         Route::resource('categories', AdminCategoryController::class)->except('show')->whereNumber('category');
         Route::resource('forum-topics', AdminForumTopicController::class)->except('show')->parameters(['forum-topics' => 'topic']);
     });

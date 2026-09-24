@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Enums\UserRole;
 use App\Enums\UserStatus;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -13,7 +12,6 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\Storage;
@@ -21,7 +19,8 @@ use Illuminate\Support\Str;
 
 /**
  * An LRMIS account. The users table belongs to LRMIS, so the ticketing system
- * only reads it and keeps the helpdesk role in its own user_roles table.
+ * only reads it. Accounts of the LRMIS Administrator type administer the
+ * helpdesk and every other account is a member.
  */
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
@@ -39,7 +38,7 @@ class User extends Authenticatable
      *
      * @var list<string>
      */
-    protected $with = ['roleAssignment', 'usertype'];
+    protected $with = ['usertype'];
 
     /**
      * Get the attributes that should be cast.
@@ -105,21 +104,11 @@ class User extends Authenticatable
     }
 
     /**
-     * Get the user's helpdesk role, which is a member until an administrator grants another.
-     *
-     * @return Attribute<UserRole, never>
-     */
-    protected function role(): Attribute
-    {
-        return Attribute::get(fn (): UserRole => $this->roleAssignment?->role ?? UserRole::User)->withoutObjectCaching();
-    }
-
-    /**
-     * Determine whether the user administers the helpdesk.
+     * Determine whether the user administers the helpdesk, which LRMIS Administrators do.
      */
     public function isAdmin(): bool
     {
-        return $this->roleAssignment?->role === UserRole::Admin;
+        return $this->usertype->isAdministrator();
     }
 
     /**
@@ -128,16 +117,6 @@ class User extends Authenticatable
     public function isActive(): bool
     {
         return $this->status === UserStatus::Active;
-    }
-
-    /**
-     * Give the user a helpdesk role, replacing any they already have.
-     */
-    public function assignRole(UserRole $role): void
-    {
-        $assignment = $this->roleAssignment()->updateOrCreate([], ['role' => $role]);
-
-        $this->setRelation('roleAssignment', $assignment);
     }
 
     /**
@@ -167,16 +146,6 @@ class User extends Authenticatable
     public function usertype(): BelongsTo
     {
         return $this->belongsTo(Usertype::class);
-    }
-
-    /**
-     * Get the user's helpdesk role assignment, if an administrator has made one.
-     *
-     * @return HasOne<UserRoleAssignment, $this>
-     */
-    public function roleAssignment(): HasOne
-    {
-        return $this->hasOne(UserRoleAssignment::class);
     }
 
     /**
