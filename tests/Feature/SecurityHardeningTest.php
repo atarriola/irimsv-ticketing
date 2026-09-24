@@ -23,6 +23,22 @@ test('strict transport security is only sent over https', function () {
         ->assertHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
 });
 
+test('the https scheme forwarded by a local proxy is trusted', function () {
+    $this->withServerVariables(['REMOTE_ADDR' => '127.0.0.1'])
+        ->withHeader('X-Forwarded-Proto', 'https')
+        ->get(route('login'))
+        ->assertOk()
+        ->assertHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+});
+
+test('forwarded headers from the public internet are ignored', function () {
+    $this->withServerVariables(['REMOTE_ADDR' => '203.0.113.5'])
+        ->withHeader('X-Forwarded-Proto', 'https')
+        ->get(route('login'))
+        ->assertOk()
+        ->assertHeaderMissing('Strict-Transport-Security');
+});
+
 test('a session is signed out once its password has been changed elsewhere', function () {
     $user = User::factory()->create();
 
