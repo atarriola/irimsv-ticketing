@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 
@@ -27,6 +28,7 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->configureDefaults();
         $this->configureRateLimiting();
+        $this->configureUrlScheme();
     }
 
     /**
@@ -41,6 +43,15 @@ class AppServiceProvider extends ServiceProvider
         Password::defaults(fn (): ?Password => $this->app->isProduction()
             ? Password::min(12)->mixedCase()->numbers()
             : null);
+    }
+
+    /**
+     * Generate HTTPS links whenever the public APP_URL is HTTPS, even when a
+     * TLS-terminating proxy or web server hands PHP a plain HTTP request.
+     */
+    private function configureUrlScheme(): void
+    {
+        URL::forceHttps(str_starts_with((string) config('app.url'), 'https://'));
     }
 
     /**
