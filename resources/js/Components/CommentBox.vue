@@ -51,7 +51,7 @@ defineExpose({ focus });
 
 <template>
     <form class="flex gap-2" @submit.prevent="submit">
-        <UserAvatar :name="user.name" :is-admin="user.is_admin" small />
+        <UserAvatar :name="user.name" :photo-url="user.photo_url" :is-admin="user.is_admin" small />
 
         <div class="flex min-w-0 flex-1 flex-col gap-1">
             <div class="flex items-end gap-1 rounded-2xl bg-gray-100 py-1 pr-1.5 pl-3.5 focus-within:ring-1 focus-within:ring-gray-900 dark:bg-gray-800 dark:focus-within:ring-gray-100">

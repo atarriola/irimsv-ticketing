@@ -66,7 +66,7 @@ function deleteComment() {
 
 <template>
     <article class="flex gap-2">
-        <UserAvatar :name="comment.author" :is-admin="comment.author_is_admin" small />
+        <UserAvatar :name="comment.author" :photo-url="comment.author_photo_url" :is-admin="comment.author_is_admin" small />
 
         <div class="flex min-w-0 flex-1 flex-col gap-1">
             <div class="w-fit max-w-full rounded-2xl bg-gray-100 px-3.5 py-2 dark:bg-gray-800">

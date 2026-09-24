@@ -14,7 +14,7 @@ class TicketCommentResource extends JsonResource
     /**
      * Transform the resource into an array.
      *
-     * @return array{id: int, body: string, author: string, author_position: string, author_is_admin: bool, is_mine: bool, sent_at: string, sent_on: string, can: array{delete: bool}}
+     * @return array{id: int, body: string, author: string, author_position: string, author_photo_url: string|null, author_is_admin: bool, is_mine: bool, sent_at: string, sent_on: string, can: array{delete: bool}}
      */
     public function toArray(Request $request): array
     {
@@ -23,6 +23,7 @@ class TicketCommentResource extends JsonResource
             'body' => $this->body,
             'author' => $this->author->name,
             'author_position' => $this->author->position,
+            'author_photo_url' => $this->author->photo_url,
             'author_is_admin' => $this->author->isAdmin(),
             'is_mine' => $this->user_id === $request->user()->id,
             'sent_at' => $this->created_at->format('g:i A'),

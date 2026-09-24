@@ -42,7 +42,7 @@ function deleteThread() {
         <div class="rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
             <article class="flex flex-col gap-3 border-b border-gray-100 p-5 dark:border-gray-800">
                 <header class="flex items-center gap-3">
-                    <UserAvatar :name="thread.author" :is-admin="thread.author_is_admin" />
+                    <UserAvatar :name="thread.author" :photo-url="thread.author_photo_url" :is-admin="thread.author_is_admin" />
                     <div class="flex min-w-0 flex-col">
                         <span class="flex flex-wrap items-center gap-2 text-sm">
                             <span class="font-semibold">{{ thread.author }}</span>

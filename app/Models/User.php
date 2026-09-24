@@ -16,6 +16,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 /**
  * An LRMIS account. The users table belongs to LRMIS, so the ticketing system
@@ -28,9 +30,9 @@ class User extends Authenticatable
     use HasFactory, HasUuids, Notifiable;
 
     /**
-     * The columns a constrained eager load needs to display a user by name and position.
+     * The columns a constrained eager load needs to display a user by name, photo and position.
      */
-    public const string DISPLAY_COLUMNS = 'id,firstname,lastname,extension_name,usertype_id';
+    public const string DISPLAY_COLUMNS = 'id,firstname,lastname,extension_name,photo,usertype_id';
 
     /**
      * The relationships that should always be loaded.
@@ -73,6 +75,33 @@ class User extends Authenticatable
     protected function position(): Attribute
     {
         return Attribute::get(fn (): string => $this->usertype->type_name);
+    }
+
+    /**
+     * Get the URL of the user's LRMIS profile photo, or null when they have none.
+     *
+     * LRMIS stores the photo as a bare filename inside its user_pic folder, as a
+     * folder-qualified path, or as an absolute URL, so all three are resolved.
+     *
+     * @return Attribute<string|null, never>
+     */
+    protected function photoUrl(): Attribute
+    {
+        return Attribute::get(function (): ?string {
+            $photo = trim((string) $this->photo);
+
+            if ($photo === '') {
+                return null;
+            }
+
+            if (Str::startsWith($photo, ['http://', 'https://'])) {
+                return $photo;
+            }
+
+            $path = Str::contains($photo, '/') ? ltrim($photo, '/') : 'user_pic/'.$photo;
+
+            return Storage::disk('public')->url($path);
+        });
     }
 
     /**

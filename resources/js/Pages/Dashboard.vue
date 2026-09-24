@@ -124,7 +124,7 @@ const panelLinkClasses = 'text-sm font-medium text-gray-900 underline decoration
 
             <ul v-else class="grid grid-cols-1 divide-y divide-gray-100 md:grid-cols-2 md:divide-y-0 dark:divide-gray-800">
                 <li v-for="thread in recentThreads" :key="thread.id" class="flex items-start gap-3 px-5 py-3.5">
-                    <UserAvatar :name="thread.author" :is-admin="thread.author_is_admin" small />
+                    <UserAvatar :name="thread.author" :photo-url="thread.author_photo_url" :is-admin="thread.author_is_admin" small />
                     <div class="flex min-w-0 flex-col gap-0.5">
                         <Link :href="`/forum/threads/${thread.id}`" class="truncate text-sm font-medium underline-offset-4 hover:underline">{{ thread.excerpt }}</Link>
                         <span class="flex flex-wrap items-center gap-x-1.5 text-xs text-gray-500 dark:text-gray-400">

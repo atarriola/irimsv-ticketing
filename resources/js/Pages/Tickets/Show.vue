@@ -91,7 +91,7 @@ function deleteTicket() {
                         <div :class="rowClasses">
                             <dt :class="termClasses">Reporter</dt>
                             <dd class="flex min-w-0 items-center gap-2">
-                                <UserAvatar :name="ticket.requester.name" tiny />
+                                <UserAvatar :name="ticket.requester.name" :photo-url="ticket.requester.photo_url" tiny />
                                 <span class="min-w-0">
                                     <span class="block truncate font-medium">{{ ticket.requester.name }}</span>
                                     <span class="block truncate text-xs text-gray-500 dark:text-gray-400">{{ ticket.requester.position }}</span>

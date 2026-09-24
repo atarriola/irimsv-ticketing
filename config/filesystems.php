@@ -41,7 +41,9 @@ return [
         'public' => [
             'driver' => 'local',
             'root' => storage_path('app/public'),
-            'url' => rtrim(env('APP_URL', 'http://localhost'), '/').'/storage',
+            // User photos are uploaded by LRMIS and live on its server. LRMIS_URL points
+            // image URLs there; when it is unset they fall back to this app's own host.
+            'url' => rtrim(env('LRMIS_URL') ?: env('APP_URL', 'http://localhost'), '/').'/storage',
             'visibility' => 'public',
             'throw' => false,
             'report' => false,

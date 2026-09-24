@@ -159,7 +159,7 @@ onBeforeUnmount(() => document.removeEventListener('click', closeUserMenuOnOutsi
                         :aria-expanded="isUserMenuOpen"
                         @click="isUserMenuOpen = !isUserMenuOpen"
                     >
-                        <UserAvatar :name="user.name" :is-admin="user.is_admin" small />
+                        <UserAvatar :name="user.name" :photo-url="user.photo_url" :is-admin="user.is_admin" small />
                         <span class="hidden min-w-0 flex-col text-left md:flex">
                             <span class="max-w-40 truncate text-sm leading-tight font-medium">{{ user.name }}</span>
                             <span class="max-w-40 truncate text-xs leading-tight text-gray-500 dark:text-gray-400">{{ user.position }}</span>

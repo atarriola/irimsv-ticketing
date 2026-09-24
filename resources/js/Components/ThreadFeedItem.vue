@@ -18,7 +18,7 @@ const tagClasses = 'rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600 d
 
 <template>
     <article class="flex gap-3 border-b border-gray-100 p-4 last:border-b-0 dark:border-gray-800">
-        <UserAvatar :name="thread.author" :is-admin="thread.author_is_admin" />
+        <UserAvatar :name="thread.author" :photo-url="thread.author_photo_url" :is-admin="thread.author_is_admin" />
 
         <div class="flex min-w-0 flex-1 flex-col gap-1.5">
             <header class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">

@@ -24,6 +24,7 @@ class ForumReplyResource extends JsonResource
             'body' => $this->body,
             'author' => $this->author->name,
             'author_position' => $this->author->position,
+            'author_photo_url' => $this->author->photo_url,
             'author_is_admin' => $this->author->isAdmin(),
             'created_at' => $this->created_at->gt(now()->subMinute()) ? 'Just now' : $this->created_at->shortAbsoluteDiffForHumans(),
             'reactions' => $this->whenLoaded('reactions', fn (): array => $this->reactionSummary($request->user())),

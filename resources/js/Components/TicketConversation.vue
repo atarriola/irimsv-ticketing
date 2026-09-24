@@ -121,7 +121,7 @@ onBeforeUnmount(() => {
                 </p>
 
                 <article class="flex items-end gap-2" :class="message.is_mine ? 'flex-row-reverse' : ''">
-                    <UserAvatar :name="message.author" :is-admin="message.author_is_admin" small />
+                    <UserAvatar :name="message.author" :photo-url="message.author_photo_url" :is-admin="message.author_is_admin" small />
 
                     <div class="flex max-w-[80%] min-w-0 flex-col gap-1" :class="message.is_mine ? 'items-end' : 'items-start'">
                         <span class="flex items-center gap-2 px-1 text-xs text-gray-500 dark:text-gray-400">

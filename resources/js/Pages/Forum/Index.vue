@@ -38,7 +38,7 @@ const pillSelectClasses =
             class="flex gap-3 rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900"
             #default="{ errors, processing }"
         >
-            <UserAvatar :name="user.name" :is-admin="user.is_admin" />
+            <UserAvatar :name="user.name" :photo-url="user.photo_url" :is-admin="user.is_admin" />
 
             <div class="flex min-w-0 flex-1 flex-col gap-3">
                 <label for="body" class="sr-only">Start a thread</label>

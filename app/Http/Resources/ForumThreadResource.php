@@ -27,6 +27,7 @@ class ForumThreadResource extends JsonResource
             'topic' => $this->topic->only(['name', 'slug']),
             'author' => $this->author->name,
             'author_position' => $this->author->position,
+            'author_photo_url' => $this->author->photo_url,
             'author_is_admin' => $this->author->isAdmin(),
             'replies_count' => $this->replies_count,
             'is_pinned' => $this->is_pinned,

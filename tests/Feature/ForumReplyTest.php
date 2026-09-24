@@ -17,7 +17,8 @@ test('a guest cannot comment', function () {
 });
 
 test('a user can comment on a thread and the thread becomes the most recently active', function () {
-    $user = User::factory()->for(Usertype::factory()->create(['type_name' => 'Teacher']))->create(['firstname' => 'Maria', 'lastname' => 'Santos']);
+    config()->set('filesystems.disks.public.url', 'https://lrmis.test/storage');
+    $user = User::factory()->for(Usertype::factory()->create(['type_name' => 'Teacher']))->create(['firstname' => 'Maria', 'lastname' => 'Santos', 'photo' => 'maria_santos.jpg']);
     $thread = ForumThread::factory()->create(['last_activity_at' => now()->subWeek()]);
 
     $this->actingAs($user)
@@ -26,6 +27,7 @@ test('a user can comment on a thread and the thread becomes the most recently ac
         ->assertJsonPath('reply.body', 'Have you tried clearing the cache?')
         ->assertJsonPath('reply.author', 'Maria Santos')
         ->assertJsonPath('reply.author_position', 'Teacher')
+        ->assertJsonPath('reply.author_photo_url', 'https://lrmis.test/storage/user_pic/maria_santos.jpg')
         ->assertJsonPath('reply.parent_id', null)
         ->assertJsonPath('reply.children', [])
         ->assertJsonPath('reply.can.delete', true)

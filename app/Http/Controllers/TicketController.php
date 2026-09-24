@@ -163,7 +163,7 @@ class TicketController extends Controller
                 'status' => $ticket->status->value,
                 'priority' => $ticket->priority->value,
                 'category' => $ticket->category?->name,
-                'requester' => $ticket->requester->only(['name', 'position', 'email']),
+                'requester' => $ticket->requester->only(['name', 'position', 'email', 'photo_url']),
                 'created_at' => $ticket->created_at->toDayDateTimeString(),
                 'updated_at' => $ticket->updated_at->diffForHumans(),
                 'resolved_at' => $ticket->resolved_at?->toDayDateTimeString(),

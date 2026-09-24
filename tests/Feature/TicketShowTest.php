@@ -17,7 +17,8 @@ test('a guest is sent to the login page when opening a ticket', function () {
 });
 
 test('a requester sees their ticket, its comments in order and what they may do', function () {
-    $requester = User::factory()->for(Usertype::factory()->create(['type_name' => 'School Head']))->create();
+    config()->set('filesystems.disks.public.url', 'https://lrmis.test/storage');
+    $requester = User::factory()->for(Usertype::factory()->create(['type_name' => 'School Head']))->create(['photo' => 'school_head.jpg']);
     $ticket = Ticket::factory()->for($requester, 'requester')->create(['subject' => 'Printer offline', 'type' => TicketType::Problem]);
     $adminComment = TicketComment::factory()->for($ticket)->for(User::factory()->admin(), 'author')->create(['created_at' => now()->subHour()]);
     $ownComment = TicketComment::factory()->for($ticket)->for($requester, 'author')->create();
@@ -31,12 +32,15 @@ test('a requester sees their ticket, its comments in order and what they may do'
             ->where('ticket.group', 'issues')
             ->where('ticket.requester.name', $requester->name)
             ->where('ticket.requester.position', 'School Head')
+            ->where('ticket.requester.photo_url', 'https://lrmis.test/storage/user_pic/school_head.jpg')
             ->missing('ticket.assignee')
             ->has('comments', 2)
             ->where('comments.0.id', $adminComment->id)
             ->where('comments.0.author_is_admin', true)
+            ->where('comments.0.author_photo_url', null)
             ->where('comments.0.can.delete', false)
             ->where('comments.1.id', $ownComment->id)
+            ->where('comments.1.author_photo_url', 'https://lrmis.test/storage/user_pic/school_head.jpg')
             ->where('comments.1.can.delete', true)
             ->where('can.update', true)
             ->where('can.comment', true)
