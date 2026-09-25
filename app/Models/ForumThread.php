@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use App\Enums\ForumThreadType;
+use App\Events\ForumThreadChanged;
+use App\Events\ForumThreadPosted;
 use App\Models\Concerns\HasReactions;
 use Database\Factories\ForumThreadFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -61,6 +63,16 @@ class ForumThread extends Model
         static::creating(function (ForumThread $thread): void {
             $thread->last_activity_at ??= now();
         });
+
+        // The feed is told about a new thread, and a thread's readers about anything that changes what they see.
+        // Recording activity after a reply is left out, because the reply announces itself.
+        static::created(fn (ForumThread $thread) => ForumThreadPosted::announce($thread->id));
+        static::updated(function (ForumThread $thread): void {
+            if ($thread->wasChanged(['forum_topic_id', 'type', 'body', 'is_pinned', 'is_locked'])) {
+                ForumThreadChanged::announce($thread->id);
+            }
+        });
+        static::deleted(fn (ForumThread $thread) => ForumThreadChanged::announce($thread->id));
     }
 
     /**
@@ -157,5 +169,18 @@ class ForumThread extends Model
     {
         $this->last_activity_at = now();
         $this->save();
+    }
+
+    /**
+     * Count the thread's replies at every level, and its top-level comments.
+     *
+     * @return array{replies_count: int, comments_count: int}
+     */
+    public function conversationTotals(): array
+    {
+        return [
+            'replies_count' => $this->replies()->count(),
+            'comments_count' => $this->comments()->reorder()->count(),
+        ];
     }
 }

@@ -1,6 +1,7 @@
 <script setup>
-import { Form, Head, InfiniteScroll, Link, usePage } from '@inertiajs/vue3';
-import { computed } from 'vue';
+import { Form, Head, InfiniteScroll, Link, router, usePage, usePoll } from '@inertiajs/vue3';
+import { echoIsConfigured, useConnectionStatus, useEcho } from '@laravel/echo-vue';
+import { computed, ref, watch } from 'vue';
 import ThreadFeedItem from '@/Components/ThreadFeedItem.vue';
 import UserAvatar from '@/Components/UserAvatar.vue';
 import AppLayout from '@/Layouts/AppLayout.vue';
@@ -13,12 +14,69 @@ const props = defineProps({
     reactionTypes: Array,
     currentTopic: String,
     threads: Object,
+    latestThreadId: Number,
+    newThreadsCount: Number,
+    threadActivity: Object,
     can: Object,
 });
+
+// How often an open feed asks whether anyone has posted since it was loaded: rarely when a WebSocket announces new posts, otherwise often.
+const hasSocket = echoIsConfigured();
+const CHECK_FOR_POSTS_EVERY_MS = hasSocket ? 30000 : 10000;
 
 const page = usePage();
 const user = computed(() => page.props.auth.user);
 const defaultTopicId = computed(() => (props.topics.find((topic) => topic.slug === props.currentTopic) ?? props.topics[0])?.id);
+const feedUrl = computed(() => (props.currentTopic ? `/forum?topic=${props.currentTopic}` : '/forum'));
+
+// The newest thread the feed showed when it was last loaded; the server counts what was posted after it.
+const seenThreadId = ref(props.latestThreadId ?? 0);
+const newThreadsCount = computed(() => props.newThreadsCount ?? 0);
+
+watch(
+    () => props.latestThreadId,
+    (latestThreadId) => (seenThreadId.value = latestThreadId ?? 0),
+);
+
+// The feed items currently on screen, by thread id, so a change to a thread can be applied to the right one.
+const feedItems = new Map();
+
+function registerFeedItem(threadId, item) {
+    if (item) {
+        feedItems.set(threadId, item);
+    } else {
+        feedItems.delete(threadId);
+    }
+}
+
+const socket = hasSocket ? useConnectionStatus() : ref('disconnected');
+
+// With a WebSocket connected the server announces every change; without one the poll also asks which threads on screen changed.
+const checkForNewThreads = () =>
+    socket.value === 'connected'
+        ? { data: { seen: seenThreadId.value }, only: ['newThreadsCount'], preserveUrl: true }
+        : { data: { seen: seenThreadId.value, threads: [...feedItems.keys()] }, only: ['newThreadsCount', 'threadActivity'], preserveUrl: true };
+
+usePoll(CHECK_FOR_POSTS_EVERY_MS, checkForNewThreads, { mode: 'rest' });
+
+watch(
+    () => props.threadActivity,
+    (activity) => Object.entries(activity ?? {}).forEach(([threadId, item]) => feedItems.get(Number(threadId))?.applyActivity(item)),
+);
+
+if (hasSocket) {
+    useEcho('forum', 'ForumThreadPosted', () => router.reload(checkForNewThreads()));
+    useEcho('forum', 'ForumThreadChanged', ({ threadId }) => feedItems.get(threadId)?.syncConversation());
+}
+
+function showNewThreads() {
+    router.visit(feedUrl.value, {
+        only: ['threads', 'latestThreadId', 'newThreadsCount'],
+        reset: ['threads'],
+        preserveState: true,
+        preserveScroll: true,
+    });
+}
 
 const pillSelectClasses =
     'cursor-pointer rounded-full border border-gray-300 bg-white py-1.5 pr-7 pl-3 text-xs font-medium text-gray-700 outline-none focus:border-gray-900 focus:ring-1 focus:ring-gray-900 dark:focus:border-gray-100 dark:focus:ring-gray-100 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300';
@@ -97,12 +155,23 @@ const pillSelectClasses =
             </Link>
         </nav>
 
+        <div role="status" class="flex justify-center empty:hidden">
+            <button
+                v-if="newThreadsCount > 0"
+                type="button"
+                class="cursor-pointer rounded-full bg-gray-900 px-4 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:bg-gray-700 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200"
+                @click="showNewThreads"
+            >
+                {{ newThreadsCount }} new {{ newThreadsCount === 1 ? 'post' : 'posts' }} &middot; Show
+            </button>
+        </div>
+
         <p v-if="threads.data.length === 0" class="rounded-lg border border-dashed border-gray-300 bg-white px-6 py-16 text-center text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400">
             Nothing here yet. Be the first to post.
         </p>
 
         <InfiniteScroll v-else data="threads" :manual-after="3" class="rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
-            <ThreadFeedItem v-for="thread in threads.data" :key="thread.id" :thread="thread" :reaction-types="reactionTypes" />
+            <ThreadFeedItem v-for="thread in threads.data" :key="thread.id" :ref="(item) => registerFeedItem(thread.id, item)" :thread="thread" :reaction-types="reactionTypes" />
 
             <template #next="{ loading, fetch, hasMore }">
                 <div v-if="hasMore" class="flex justify-center border-t border-gray-100 p-3 dark:border-gray-800">

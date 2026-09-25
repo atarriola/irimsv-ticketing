@@ -8,9 +8,12 @@ use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ForumReplyController;
 use App\Http\Controllers\ForumReplyReactionController;
+use App\Http\Controllers\ForumThreadChangeController;
 use App\Http\Controllers\ForumThreadController;
 use App\Http\Controllers\ForumThreadModerationController;
 use App\Http\Controllers\ForumThreadReactionController;
+use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\NotificationReadController;
 use App\Http\Controllers\TicketCommentController;
 use App\Http\Controllers\TicketController;
 use App\Http\Controllers\TicketStatusController;
@@ -34,6 +37,10 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/account', AccountController::class)->name('account.show');
 
+    Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
+    Route::post('/notifications/read', [NotificationReadController::class, 'store'])->name('notifications.read.store');
+    Route::put('/notifications/{notification}/read', [NotificationReadController::class, 'update'])->whereUuid('notification')->name('notifications.read.update');
+
     Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('/users', [AdminUserController::class, 'index'])->name('users.index');
         Route::resource('categories', AdminCategoryController::class)->except('show')->whereNumber('category');
@@ -49,6 +56,7 @@ Route::middleware('auth')->group(function () {
         Route::delete('/threads/{thread}', [ForumThreadController::class, 'destroy'])->whereNumber('thread')->name('threads.destroy');
 
         Route::patch('/threads/{thread}/moderation', [ForumThreadModerationController::class, 'update'])->whereNumber('thread')->name('threads.moderation.update');
+        Route::get('/threads/{thread}/changes', [ForumThreadChangeController::class, 'index'])->whereNumber('thread')->name('threads.changes.index');
         Route::post('/threads/{thread}/reactions', [ForumThreadReactionController::class, 'store'])->whereNumber('thread')->middleware('throttle:posting')->name('threads.reactions.store');
         Route::post('/replies/{reply}/reactions', [ForumReplyReactionController::class, 'store'])->whereNumber('reply')->middleware('throttle:posting')->name('replies.reactions.store');
         Route::get('/threads/{thread}/replies', [ForumReplyController::class, 'index'])->whereNumber('thread')->name('threads.replies.index');

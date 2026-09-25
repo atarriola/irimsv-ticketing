@@ -40,6 +40,9 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => $this->authenticatedUser($request),
             ],
+            // The badge on the notification bell; the layout polls this when no WebSocket is connected.
+            // Until the notifications table has been migrated the count is simply zero, so no page breaks.
+            'unreadNotifications' => fn (): int => rescue(fn (): int => $request->user()?->unreadNotifications()->count() ?? 0, 0, report: false),
         ];
     }
 

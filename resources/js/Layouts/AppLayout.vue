@@ -3,6 +3,7 @@ import { Link, router, usePage } from '@inertiajs/vue3';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import AppIcon from '@/Components/AppIcon.vue';
 import AppLogo from '@/Components/AppLogo.vue';
+import NotificationBell from '@/Components/NotificationBell.vue';
 import ThemeToggle from '@/Components/ThemeToggle.vue';
 import UserAvatar from '@/Components/UserAvatar.vue';
 
@@ -148,6 +149,8 @@ onBeforeUnmount(() => document.removeEventListener('click', closeUserMenuOnOutsi
                     <span class="hidden sm:inline">New ticket</span>
                     <span class="sm:hidden">New</span>
                 </Link>
+
+                <NotificationBell />
 
                 <ThemeToggle />
 

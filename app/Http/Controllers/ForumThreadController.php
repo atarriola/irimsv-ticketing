@@ -12,6 +12,7 @@ use App\Models\ForumReply;
 use App\Models\ForumThread;
 use App\Models\ForumTopic;
 use App\Models\User;
+use App\Notifications\ForumThreadStarted;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -30,13 +31,13 @@ class ForumThreadController extends Controller
 
         $options = $this->formOptions();
         $topic = $options['topics']->firstWhere('slug', $request->query('topic'));
+        $threads = fn () => ForumThread::query()->when($topic, fn ($query) => $query->whereBelongsTo($topic, 'topic'));
 
         return Inertia::render('Forum/Index', [
             ...$options,
             'currentTopic' => $topic?->slug,
             'reactionTypes' => ReactionType::options(),
-            'threads' => Inertia::scroll(fn () => ForumThread::query()
-                ->when($topic, fn ($query) => $query->whereBelongsTo($topic, 'topic'))
+            'threads' => Inertia::scroll(fn () => $threads()
                 ->with([
                     'author:'.User::DISPLAY_COLUMNS,
                     'topic:id,name,slug',
@@ -48,6 +49,21 @@ class ForumThreadController extends Controller
                 ->paginate(15)
                 ->withQueryString()
                 ->through(fn (ForumThread $thread): array => ForumThreadResource::make($thread)->resolve($request))),
+            // The newest thread in the feed, and how many were posted after the one an open page has "seen"; the page polls the latter.
+            'latestThreadId' => $threads()->max('id'),
+            'newThreadsCount' => Inertia::optional(fn (): int => $request->has('seen')
+                ? $threads()->where('id', '>', $request->integer('seen'))->count()
+                : 0),
+            // Per thread on screen, the reply count and version, so a feed without a WebSocket can tell which threads to resync.
+            'threadActivity' => Inertia::optional(fn (): object => (object) $threads()
+                ->whereIn('id', array_slice(array_map(intval(...), (array) $request->input('threads', [])), 0, 50))
+                ->withCount('replies')
+                ->get(['id', 'updated_at', 'last_activity_at'])
+                ->mapWithKeys(fn (ForumThread $thread): array => [$thread->id => [
+                    'replies_count' => $thread->replies_count,
+                    'version' => max($thread->updated_at, $thread->last_activity_at)->timestamp,
+                ]])
+                ->all()),
             'can' => [
                 'create' => $request->user()->can('create', ForumThread::class),
             ],
@@ -59,11 +75,28 @@ class ForumThreadController extends Controller
      */
     public function store(StoreForumThreadRequest $request): RedirectResponse
     {
-        $request->user()->forumThreads()->create($request->validated());
+        $thread = $request->user()->forumThreads()->create($request->validated());
+
+        $this->notifyAdministrators($thread, $request->user());
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Your thread has been posted.']);
 
         return redirect()->route('forum.index');
+    }
+
+    /**
+     * Tell the helpdesk administrators about the new thread, except the one who started it.
+     *
+     * A failure to notify one of them is reported and never stops the thread from being posted.
+     */
+    private function notifyAdministrators(ForumThread $thread, User $author): void
+    {
+        $thread->setRelation('author', $author);
+
+        User::administrators()
+            ->whereKeyNot($author->getKey())
+            ->get()
+            ->each(fn (User $administrator) => rescue(fn () => $administrator->notify(new ForumThreadStarted($thread))));
     }
 
     /**
@@ -72,6 +105,9 @@ class ForumThreadController extends Controller
     public function show(Request $request, ForumThread $thread): Response
     {
         Gate::authorize('view', $thread);
+
+        // Taken before the conversation is read, so the page's first live check picks up any edit made from this moment on.
+        $syncedAt = now();
 
         $thread->load(['topic:id,name,slug', 'author:'.User::DISPLAY_COLUMNS, 'reactions'])->loadCount(['replies', 'comments']);
 
@@ -83,6 +119,7 @@ class ForumThreadController extends Controller
             'thread' => ForumThreadResource::make($thread)->resolve($request),
             'comments' => $comments->getCollection()->map(fn (ForumReply $comment): array => ForumReplyResource::make($comment)->resolve($request)),
             'nextCommentsPage' => $comments->hasMorePages() ? 2 : null,
+            'syncedAt' => $syncedAt->toIso8601String(),
             'reactionTypes' => ReactionType::options(),
             'can' => [
                 'moderate' => $request->user()->can('moderate', $thread),

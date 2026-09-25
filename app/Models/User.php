@@ -120,6 +120,18 @@ class User extends Authenticatable
     }
 
     /**
+     * Scope the query to the helpdesk administrators.
+     *
+     * @param  Builder<User>  $query
+     * @return Builder<User>
+     */
+    #[Scope]
+    protected function administrators(Builder $query): Builder
+    {
+        return $query->whereHas('usertype', fn (Builder $query) => $query->where('level', Usertype::ADMINISTRATOR_LEVEL));
+    }
+
+    /**
      * Scope the query to users whose name, username or email contains the term.
      *
      * @param  Builder<User>  $query

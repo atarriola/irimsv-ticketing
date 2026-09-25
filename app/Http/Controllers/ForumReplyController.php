@@ -8,6 +8,8 @@ use App\Http\Resources\ForumReplyResource;
 use App\Models\ForumReply;
 use App\Models\ForumThread;
 use App\Models\User;
+use App\Notifications\ForumCommentReplied;
+use App\Notifications\ForumThreadCommented;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -40,7 +42,7 @@ class ForumReplyController extends Controller
      */
     public function store(StoreForumReplyRequest $request, ForumThread $thread): JsonResponse
     {
-        $parent = $request->filled('parent_id') ? $thread->replies()->find($request->integer('parent_id')) : null;
+        $parent = $request->filled('parent_id') ? $thread->replies()->with('author')->find($request->integer('parent_id')) : null;
 
         $reply = DB::transaction(function () use ($request, $thread, $parent): ForumReply {
             $reply = $thread->replies()->create([
@@ -56,10 +58,33 @@ class ForumReplyController extends Controller
 
         $reply->load(['author:'.User::DISPLAY_COLUMNS, 'reactions'])->setRelation('children', $reply->newCollection());
 
+        $this->notifyReaders($thread, $reply, $parent);
+
         return response()->json([
             'reply' => ForumReplyResource::make($reply)->resolve($request),
-            ...$this->totals($thread),
+            ...$thread->conversationTotals(),
         ], 201);
+    }
+
+    /**
+     * Tell the thread's author about the comment and, for a reply, the author of the comment it answers.
+     *
+     * The writer is never told about their own comment, one person is told once, and a failure to
+     * notify someone is reported without stopping the comment from being posted.
+     */
+    private function notifyReaders(ForumThread $thread, ForumReply $reply, ?ForumReply $parent): void
+    {
+        $thread->loadMissing('author');
+
+        collect([$parent?->author, $thread->author])
+            ->filter()
+            ->unique('id')
+            ->reject(fn (User $recipient): bool => $recipient->is($reply->author))
+            ->each(fn (User $recipient) => rescue(fn () => $recipient->notify(
+                $parent !== null && $recipient->is($parent->author)
+                    ? new ForumCommentReplied($thread, $reply)
+                    : new ForumThreadCommented($thread, $reply),
+            )));
     }
 
     /**
@@ -96,19 +121,6 @@ class ForumReplyController extends Controller
 
         $reply->delete();
 
-        return response()->json($this->totals($reply->thread));
-    }
-
-    /**
-     * Count the thread's replies at every level, and its top-level comments.
-     *
-     * @return array{replies_count: int, comments_count: int}
-     */
-    private function totals(ForumThread $thread): array
-    {
-        return [
-            'replies_count' => $thread->replies()->count(),
-            'comments_count' => $thread->comments()->reorder()->count(),
-        ];
+        return response()->json($reply->thread->conversationTotals());
     }
 }

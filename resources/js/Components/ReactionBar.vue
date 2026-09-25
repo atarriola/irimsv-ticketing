@@ -17,6 +17,11 @@ const http = useHttp({ type: '' });
 watch(
     () => props.reactions,
     (reactions) => {
+        // Leave a reaction that is still being sent alone: its own response sets the final counts.
+        if (http.processing) {
+            return;
+        }
+
         counts.value = { ...reactions.counts };
         mine.value = reactions.mine;
     },

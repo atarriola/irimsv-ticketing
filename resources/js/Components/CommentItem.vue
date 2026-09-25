@@ -1,6 +1,6 @@
 <script setup>
 import { Link, useHttp } from '@inertiajs/vue3';
-import { ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import CommentBox from '@/Components/CommentBox.vue';
 import ReactionBar from '@/Components/ReactionBar.vue';
 import UserAvatar from '@/Components/UserAvatar.vue';
@@ -13,17 +13,27 @@ const props = defineProps({
     isNested: Boolean,
 });
 
-// "totals" carries the thread's new reply counts; "reply" asks the parent comment to open its reply box.
-const emit = defineEmits(['deleted', 'totals', 'reply']);
+// "created" and "deleted" hand the server's response to the section that owns the conversation; "reply" asks the parent comment to open its reply box.
+const emit = defineEmits(['created', 'deleted', 'reply']);
 
 const http = useHttp({});
-const children = ref([...(props.comment.children ?? [])]);
+const children = computed(() => props.comment.children ?? []);
 const areChildrenShown = ref(false);
 const isReplying = ref(false);
 const replyPrefill = ref('');
 const replyBoxKey = ref(0);
 
 const linkClasses = 'cursor-pointer font-semibold text-gray-600 hover:underline dark:text-gray-400';
+
+// Close an open reply box the moment replying is switched off, for example when an admin locks the thread.
+watch(
+    () => props.canReply,
+    (canReply) => {
+        if (!canReply) {
+            isReplying.value = false;
+        }
+    },
+);
 
 function openReplyBox(mention = '') {
     replyPrefill.value = mention ? `@${mention} ` : '';
@@ -40,15 +50,9 @@ function startReply() {
 }
 
 function onReplyCreated(response) {
-    children.value.push(response.reply);
     areChildrenShown.value = true;
     isReplying.value = false;
-    emit('totals', response);
-}
-
-function onChildDeleted({ id, totals }) {
-    children.value = children.value.filter((child) => child.id !== id);
-    emit('totals', totals);
+    emit('created', response);
 }
 
 function deleteComment() {
@@ -112,7 +116,7 @@ function deleteComment() {
                     :reaction-types="reactionTypes"
                     is-nested
                     @reply="openReplyBox"
-                    @deleted="onChildDeleted"
+                    @deleted="emit('deleted', $event)"
                 />
             </div>
 

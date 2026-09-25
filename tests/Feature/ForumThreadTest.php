@@ -194,3 +194,12 @@ test('a thread author cannot pin or lock their own thread', function () {
 
     expect($thread->fresh()->is_pinned)->toBeFalse();
 });
+
+test('a thread page tells the client the server time it was rendered at, so live updates can start from there', function () {
+    $this->freezeSecond();
+    $thread = ForumThread::factory()->create();
+
+    $this->actingAs(User::factory()->create())
+        ->get(route('forum.threads.show', $thread))
+        ->assertInertia(fn (Assert $page) => $page->where('syncedAt', now()->toIso8601String()));
+});

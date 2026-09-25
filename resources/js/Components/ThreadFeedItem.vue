@@ -1,6 +1,6 @@
 <script setup>
 import { Link } from '@inertiajs/vue3';
-import { ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import CommentSection from '@/Components/CommentSection.vue';
 import ReactionBar from '@/Components/ReactionBar.vue';
 import UserAvatar from '@/Components/UserAvatar.vue';
@@ -12,12 +12,42 @@ const props = defineProps({
 
 const repliesCount = ref(props.thread.replies_count);
 const commentSection = ref(null);
+// What the comment section has learnt about the thread since the feed was rendered, laid over the page props.
+const liveChanges = ref({});
+const post = computed(() => ({ ...props.thread, ...liveChanges.value }));
+const isGone = ref(false);
+// The thread version last accounted for; the feed's poll reports the current one when no WebSocket is connected.
+const knownVersion = ref(props.thread.version);
+
+// A fresh copy of the thread from the server supersedes anything learnt live.
+watch(
+    () => props.thread,
+    (thread) => {
+        liveChanges.value = {};
+        knownVersion.value = thread.version;
+    },
+);
 
 const tagClasses = 'rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600 dark:bg-gray-800 dark:text-gray-400';
+
+function syncConversation() {
+    commentSection.value?.sync();
+}
+
+// Resync when the feed's poll shows the thread has more or fewer replies than shown, or was edited or moderated.
+function applyActivity({ replies_count: currentRepliesCount, version }) {
+    if (currentRepliesCount !== repliesCount.value || version !== knownVersion.value) {
+        knownVersion.value = version;
+        syncConversation();
+    }
+}
+
+// The feed calls these when the server announces a change to this thread, or when its poll spots one.
+defineExpose({ syncConversation, applyActivity });
 </script>
 
 <template>
-    <article class="flex gap-3 border-b border-gray-100 p-4 last:border-b-0 dark:border-gray-800">
+    <article v-if="!isGone" class="flex gap-3 border-b border-gray-100 p-4 last:border-b-0 dark:border-gray-800">
         <UserAvatar :name="thread.author" :photo-url="thread.author_photo_url" :is-admin="thread.author_is_admin" />
 
         <div class="flex min-w-0 flex-1 flex-col gap-1.5">
@@ -29,11 +59,11 @@ const tagClasses = 'rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600 d
             </header>
 
             <Link :href="`/forum/threads/${thread.id}`" prefetch class="line-clamp-6 text-sm leading-relaxed break-words whitespace-pre-line text-gray-800 dark:text-gray-200">
-                {{ thread.body }}
+                {{ post.body }}
             </Link>
 
             <footer class="flex flex-wrap items-center gap-x-3 gap-y-2 pt-1">
-                <ReactionBar :url="`/forum/threads/${thread.id}/reactions`" :reactions="thread.reactions" :types="reactionTypes" />
+                <ReactionBar :url="`/forum/threads/${thread.id}/reactions`" :reactions="post.reactions" :types="reactionTypes" />
 
                 <button
                     type="button"
@@ -54,8 +84,8 @@ const tagClasses = 'rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600 d
                 <span class="flex flex-wrap items-center gap-2">
                     <span :class="tagClasses">{{ thread.topic.name }}</span>
                     <span :class="tagClasses">{{ thread.type }}</span>
-                    <span v-if="thread.is_pinned" :class="tagClasses">Pinned</span>
-                    <span v-if="thread.is_locked" :class="tagClasses">Locked</span>
+                    <span v-if="post.is_pinned" :class="tagClasses">Pinned</span>
+                    <span v-if="post.is_locked" :class="tagClasses">Locked</span>
                 </span>
             </footer>
 
@@ -66,10 +96,12 @@ const tagClasses = 'rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600 d
                 :initial-comments="thread.preview_comments"
                 :comments-count="thread.comments_count"
                 :next-page="thread.comments_count > thread.preview_comments.length ? 1 : null"
-                :can-reply="thread.can.reply"
-                :is-locked="thread.is_locked"
+                :can-reply="post.can.reply"
+                :is-locked="post.is_locked"
                 :reaction-types="reactionTypes"
                 @totals="repliesCount = $event.replies_count"
+                @thread="liveChanges = $event"
+                @gone="isGone = true"
             />
         </div>
     </article>

@@ -1,10 +1,12 @@
 <?php
 
+use App\Http\Middleware\HandleInertiaRequests;
 use App\Models\ForumReply;
 use App\Models\ForumThread;
 use App\Models\ForumTopic;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
 use Inertia\Testing\AssertableInertia as Assert;
 
 uses(RefreshDatabase::class);
@@ -87,4 +89,75 @@ test('the feed loads fifteen threads at a time', function () {
     $this->actingAs(User::factory()->create())
         ->get(route('forum.index', ['page' => 2]))
         ->assertInertia(fn (Assert $page) => $page->has('threads.data', 1));
+});
+
+test('the feed tells the client the newest thread it shows', function () {
+    ForumThread::factory()->create();
+    $newest = ForumThread::factory()->create();
+
+    $this->actingAs(User::factory()->create())
+        ->get(route('forum.index'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('latestThreadId', $newest->id)
+            ->missing('newThreadsCount'));
+});
+
+test('an open feed can ask how many threads were posted after the newest one it shows, within its topic', function () {
+    $topic = ForumTopic::factory()->create(['slug' => 'ideas']);
+    $seen = ForumThread::factory()->for($topic, 'topic')->create();
+    ForumThread::factory()->for($topic, 'topic')->create();
+    ForumThread::factory()->create();
+
+    $this->actingAs(User::factory()->create())
+        ->get(route('forum.index', ['topic' => 'ideas', 'seen' => $seen->id]), [
+            'X-Inertia' => 'true',
+            'X-Inertia-Version' => app(HandleInertiaRequests::class)->version(Request::create('/forum')),
+            'X-Inertia-Partial-Component' => 'Forum/Index',
+            'X-Inertia-Partial-Data' => 'newThreadsCount',
+        ])
+        ->assertOk()
+        ->assertJsonPath('props.newThreadsCount', 1)
+        ->assertJsonMissingPath('props.threads');
+});
+
+test('an empty feed learns about the first thread posted', function () {
+    ForumThread::factory()->create();
+
+    $this->actingAs(User::factory()->create())
+        ->get(route('forum.index', ['seen' => 0]), [
+            'X-Inertia' => 'true',
+            'X-Inertia-Version' => app(HandleInertiaRequests::class)->version(Request::create('/forum')),
+            'X-Inertia-Partial-Component' => 'Forum/Index',
+            'X-Inertia-Partial-Data' => 'newThreadsCount',
+        ])
+        ->assertOk()
+        ->assertJsonPath('props.newThreadsCount', 1);
+});
+
+test('the feed gives each thread a version that changes with edits and replies', function () {
+    $this->freezeSecond();
+    $thread = ForumThread::factory()->create(['updated_at' => now()->subDay(), 'last_activity_at' => now()->subHour()]);
+
+    $this->actingAs(User::factory()->create())
+        ->get(route('forum.index'))
+        ->assertInertia(fn (Assert $page) => $page->where('threads.data.0.version', now()->subHour()->timestamp));
+});
+
+test('an open feed can ask for the activity of the threads it shows', function () {
+    $this->freezeSecond();
+    $thread = ForumThread::factory()->create(['updated_at' => now()->subDay(), 'last_activity_at' => now()]);
+    ForumReply::factory(2)->for($thread, 'thread')->create();
+    $unasked = ForumThread::factory()->create();
+
+    $this->actingAs(User::factory()->create())
+        ->get(route('forum.index', ['threads' => [$thread->id]]), [
+            'X-Inertia' => 'true',
+            'X-Inertia-Version' => app(HandleInertiaRequests::class)->version(Request::create('/forum')),
+            'X-Inertia-Partial-Component' => 'Forum/Index',
+            'X-Inertia-Partial-Data' => 'threadActivity',
+        ])
+        ->assertOk()
+        ->assertJsonPath("props.threadActivity.{$thread->id}.replies_count", 2)
+        ->assertJsonPath("props.threadActivity.{$thread->id}.version", now()->timestamp)
+        ->assertJsonMissingPath("props.threadActivity.{$unasked->id}");
 });

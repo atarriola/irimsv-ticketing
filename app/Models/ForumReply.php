@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Events\ForumThreadChanged;
 use App\Models\Concerns\HasReactions;
 use Database\Factories\ForumReplyFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -15,6 +16,16 @@ class ForumReply extends Model
 {
     /** @use HasFactory<ForumReplyFactory> */
     use HasFactory, HasReactions;
+
+    /**
+     * Perform any actions required after the model boots.
+     */
+    protected static function booted(): void
+    {
+        // Everyone reading the thread is told to refresh their copy of the conversation.
+        static::saved(fn (ForumReply $reply) => ForumThreadChanged::announce($reply->forum_thread_id));
+        static::deleted(fn (ForumReply $reply) => ForumThreadChanged::announce($reply->forum_thread_id));
+    }
 
     /**
      * Get the thread the reply belongs to.

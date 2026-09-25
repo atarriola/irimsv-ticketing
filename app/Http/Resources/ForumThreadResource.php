@@ -32,6 +32,8 @@ class ForumThreadResource extends JsonResource
             'replies_count' => $this->replies_count,
             'is_pinned' => $this->is_pinned,
             'is_locked' => $this->is_locked,
+            // Changes whenever the thread is edited, moderated or replied to; the feed compares it to spot activity without a socket.
+            'version' => max($this->updated_at, $this->last_activity_at)->timestamp,
             'created_at' => $this->created_at->diffForHumans(),
             'comments_count' => $this->whenCounted('comments'),
             'reactions' => $this->whenLoaded('reactions', fn (): array => $this->reactionSummary($request->user())),
