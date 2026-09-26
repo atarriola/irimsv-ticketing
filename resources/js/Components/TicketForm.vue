@@ -1,7 +1,7 @@
 <script setup>
 import { Form, Link } from '@inertiajs/vue3';
+import AttachmentsField from '@/Components/AttachmentsField.vue';
 import FormField from '@/Components/FormField.vue';
-import ImageAttachmentsField from '@/Components/ImageAttachmentsField.vue';
 import SubmitButton from '@/Components/SubmitButton.vue';
 import TextAreaField from '@/Components/TextAreaField.vue';
 
@@ -88,7 +88,13 @@ const choiceClasses =
             required
         />
 
-        <ImageAttachmentsField :existing="ticket.attachments ?? []" :ticket-id="ticket.id ?? null" :error="attachmentError(errors)" />
+        <AttachmentsField
+            :existing="ticket.attachments ?? []"
+            :remove-base-url="ticket.id ? `/tickets/${ticket.id}/attachments` : null"
+            label="Screenshots"
+            hint="Up to 5 images of 5 MB each, as JPG, PNG, GIF or WebP."
+            :error="attachmentError(errors)"
+        />
 
         <div class="flex items-center justify-end gap-3">
             <Link :href="cancelHref" class="rounded-lg px-4 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800">Cancel</Link>

@@ -24,8 +24,8 @@
     RewriteRule ^ index.php [L]
 </IfModule>
 
-# Ticket screenshots: up to five images of 5 MB each per request, plus the form fields.
+# Uploads: ticket screenshots of 5 MB and news videos of 50 MB, several per request, plus the form fields.
 <IfModule mod_php.c>
-    php_value upload_max_filesize 5M
-    php_value post_max_size 30M
+    php_value upload_max_filesize 50M
+    php_value post_max_size 120M
 </IfModule>

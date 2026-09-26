@@ -12,6 +12,7 @@ use App\Http\Controllers\ForumThreadChangeController;
 use App\Http\Controllers\ForumThreadController;
 use App\Http\Controllers\ForumThreadModerationController;
 use App\Http\Controllers\ForumThreadReactionController;
+use App\Http\Controllers\NewsAttachmentController;
 use App\Http\Controllers\NewsPostController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\NotificationReadController;
@@ -40,6 +41,8 @@ Route::middleware('auth')->group(function () {
     Route::delete('/tickets/{ticket}/attachments/{attachment}', [TicketAttachmentController::class, 'destroy'])->whereNumber(['ticket', 'attachment'])->scopeBindings()->name('tickets.attachments.destroy');
 
     Route::resource('news', NewsPostController::class)->parameters(['news' => 'post'])->whereNumber('post');
+    Route::get('/news/{post}/attachments/{attachment}', [NewsAttachmentController::class, 'show'])->whereNumber(['post', 'attachment'])->scopeBindings()->name('news.attachments.show');
+    Route::delete('/news/{post}/attachments/{attachment}', [NewsAttachmentController::class, 'destroy'])->whereNumber(['post', 'attachment'])->scopeBindings()->name('news.attachments.destroy');
 
     Route::get('/account', AccountController::class)->name('account.show');
 

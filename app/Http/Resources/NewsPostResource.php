@@ -31,6 +31,9 @@ class NewsPostResource extends JsonResource
             'is_published' => $this->isPublished(),
             'published_on' => $this->published_at?->toFormattedDateString(),
             'updated_at' => $this->updated_at->diffForHumans(),
+            // The first photo when a list asked for it, and every file when the post page did.
+            'cover_url' => $this->whenLoaded('coverImage', fn (): string => route('news.attachments.show', ['post' => $this->id, 'attachment' => $this->coverImage->id])),
+            'attachments' => $this->whenLoaded('attachments', fn (): array => NewsAttachmentResource::collection($this->attachments)->resolve($request)),
         ];
     }
 }

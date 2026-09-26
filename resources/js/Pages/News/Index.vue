@@ -64,19 +64,28 @@ const draftClasses = 'rounded bg-gray-100 px-1.5 py-0.5 text-[0.6875rem] font-bo
                 <Link
                     :href="`/news/${post.id}`"
                     prefetch
-                    class="flex flex-col gap-2 rounded-lg border border-gray-200 bg-white p-5 transition hover:border-gray-400 dark:border-gray-800 dark:bg-gray-900 dark:hover:border-gray-600"
+                    class="flex gap-4 rounded-lg border border-gray-200 bg-white p-5 transition hover:border-gray-400 dark:border-gray-800 dark:bg-gray-900 dark:hover:border-gray-600"
                 >
-                    <span class="flex flex-wrap items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                        <NewsKindBadge :kind="post.kind" />
-                        <span v-if="!post.is_published" :class="draftClasses">Draft</span>
-                        <span v-if="post.published_on">{{ post.published_on }}</span>
+                    <span class="flex min-w-0 flex-1 flex-col gap-2">
+                        <span class="flex flex-wrap items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                            <NewsKindBadge :kind="post.kind" />
+                            <span v-if="!post.is_published" :class="draftClasses">Draft</span>
+                            <span v-if="post.published_on">{{ post.published_on }}</span>
+                        </span>
+                        <span class="text-lg font-semibold tracking-tight break-words">{{ post.title }}</span>
+                        <span class="text-sm text-gray-600 dark:text-gray-400">{{ post.excerpt }}</span>
+                        <span class="flex items-center gap-2 pt-1 text-xs text-gray-500 dark:text-gray-400">
+                            <UserAvatar :name="post.author" :photo-url="post.author_photo_url" :is-admin="post.author_is_admin" tiny />
+                            {{ post.author }}
+                        </span>
                     </span>
-                    <span class="text-lg font-semibold tracking-tight break-words">{{ post.title }}</span>
-                    <span class="text-sm text-gray-600 dark:text-gray-400">{{ post.excerpt }}</span>
-                    <span class="flex items-center gap-2 pt-1 text-xs text-gray-500 dark:text-gray-400">
-                        <UserAvatar :name="post.author" :photo-url="post.author_photo_url" :is-admin="post.author_is_admin" tiny />
-                        {{ post.author }}
-                    </span>
+                    <img
+                        v-if="post.cover_url"
+                        :src="post.cover_url"
+                        alt=""
+                        loading="lazy"
+                        class="size-20 shrink-0 rounded-lg border border-gray-200 bg-gray-100 object-cover sm:size-28 dark:border-gray-700 dark:bg-gray-800"
+                    />
                 </Link>
             </li>
         </ul>

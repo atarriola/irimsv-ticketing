@@ -11,6 +11,9 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Str;
 
 #[Fillable(['kind', 'title', 'body', 'published_at'])]
@@ -18,6 +21,15 @@ class NewsPost extends Model
 {
     /** @use HasFactory<NewsPostFactory> */
     use HasFactory;
+
+    /**
+     * Perform any actions required after the model boots.
+     */
+    protected static function booted(): void
+    {
+        // Attachments are deleted one by one, so each one's file is removed from disk too.
+        static::deleting(fn (NewsPost $post) => $post->attachments()->get()->each->delete());
+    }
 
     /**
      * Get the attributes that should be cast.
@@ -58,6 +70,39 @@ class NewsPost extends Model
     public function author(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id');
+    }
+
+    /**
+     * Get the photos and videos that go with the post, in the order they were added.
+     *
+     * @return HasMany<NewsAttachment, $this>
+     */
+    public function attachments(): HasMany
+    {
+        return $this->hasMany(NewsAttachment::class)->oldest('id');
+    }
+
+    /**
+     * Get the first photo added to the post, shown as its cover in lists.
+     *
+     * @return HasOne<NewsAttachment, $this>
+     */
+    public function coverImage(): HasOne
+    {
+        return $this->hasOne(NewsAttachment::class)->ofMany(['id' => 'min'], fn (Builder $query) => $query->images());
+    }
+
+    /**
+     * Keep an uploaded photo or video with the post, on the attachments disk.
+     */
+    public function addAttachment(UploadedFile $file): NewsAttachment
+    {
+        return $this->attachments()->create([
+            'path' => $file->store("news-attachments/{$this->id}", NewsAttachment::DISK),
+            'name' => Str::limit($file->getClientOriginalName(), 255, ''),
+            'mime_type' => $file->getMimeType() ?? 'application/octet-stream',
+            'size' => $file->getSize(),
+        ]);
     }
 
     /**

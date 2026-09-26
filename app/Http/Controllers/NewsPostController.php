@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\NewsKind;
 use App\Http\Requests\SaveNewsPostRequest;
+use App\Http\Resources\NewsAttachmentResource;
 use App\Http\Resources\NewsPostResource;
 use App\Models\NewsPost;
 use App\Models\User;
@@ -30,7 +31,7 @@ class NewsPostController extends Controller
             'currentKind' => $kind?->value,
             'posts' => NewsPost::visibleTo($request->user())
                 ->when($kind, fn (Builder $query) => $query->where('kind', $kind))
-                ->with('author:'.User::DISPLAY_COLUMNS)
+                ->with(['author:'.User::DISPLAY_COLUMNS, 'coverImage'])
                 ->newestFirst()
                 ->paginate(10)
                 ->withQueryString()
@@ -52,11 +53,13 @@ class NewsPostController extends Controller
     }
 
     /**
-     * Publish a new post by the signed-in administrator, or keep it as a draft.
+     * Publish a new post by the signed-in administrator, or keep it as a draft, with any photos and videos sent along.
      */
     public function store(SaveNewsPostRequest $request): RedirectResponse
     {
         $post = $request->user()->newsPosts()->create($request->postAttributes());
+
+        $this->attachFiles($post, $request);
 
         Inertia::flash('toast', [
             'type' => 'success',
@@ -73,7 +76,7 @@ class NewsPostController extends Controller
     {
         Gate::authorize('view', $post);
 
-        $post->load('author:'.User::DISPLAY_COLUMNS);
+        $post->load(['author:'.User::DISPLAY_COLUMNS, 'attachments']);
 
         return Inertia::render('News/Show', [
             'post' => NewsPostResource::make($post)->resolve($request),
@@ -87,9 +90,11 @@ class NewsPostController extends Controller
     /**
      * Display the form for editing a post.
      */
-    public function edit(NewsPost $post): Response
+    public function edit(Request $request, NewsPost $post): Response
     {
         Gate::authorize('update', $post);
+
+        $post->load('attachments');
 
         return Inertia::render('News/Form', [
             'kinds' => NewsKind::options(),
@@ -99,16 +104,19 @@ class NewsPostController extends Controller
                 'title' => $post->title,
                 'body' => $post->body,
                 'is_published' => $post->isPublished(),
+                'attachments' => NewsAttachmentResource::collection($post->attachments)->resolve($request),
             ],
         ]);
     }
 
     /**
-     * Update a post.
+     * Update a post, adding any photos and videos sent along.
      */
     public function update(SaveNewsPostRequest $request, NewsPost $post): RedirectResponse
     {
         $post->update($request->postAttributes());
+
+        $this->attachFiles($post, $request);
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'The post has been updated.']);
 
@@ -116,7 +124,7 @@ class NewsPostController extends Controller
     }
 
     /**
-     * Delete a post.
+     * Delete a post together with its files.
      */
     public function destroy(NewsPost $post): RedirectResponse
     {
@@ -127,5 +135,15 @@ class NewsPostController extends Controller
         Inertia::flash('toast', ['type' => 'success', 'message' => 'The post has been deleted.']);
 
         return redirect()->route('news.index');
+    }
+
+    /**
+     * Keep the photos and videos sent with the form on the post.
+     */
+    private function attachFiles(NewsPost $post, SaveNewsPostRequest $request): void
+    {
+        foreach ($request->validated('attachments') ?? [] as $file) {
+            $post->addAttachment($file);
+        }
     }
 }

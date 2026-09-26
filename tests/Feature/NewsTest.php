@@ -1,9 +1,12 @@
 <?php
 
 use App\Enums\NewsKind;
+use App\Models\NewsAttachment;
 use App\Models\NewsPost;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 
 uses(RefreshDatabase::class);
@@ -250,4 +253,135 @@ test('an administrator can delete a post', function () {
         ->assertInertiaFlash('toast.type', 'success');
 
     expect(NewsPost::count())->toBe(0);
+});
+
+test('an administrator can attach photos and videos when publishing a post', function () {
+    Storage::fake(NewsAttachment::DISK);
+
+    $this->actingAs(User::factory()->admin()->create())
+        ->post(route('news.store'), newsPayload([
+            'attachments' => [UploadedFile::fake()->image('poster.png', 1200, 800), UploadedFile::fake()->create('launch.mp4', 2048, 'video/mp4')],
+        ]))
+        ->assertSessionDoesntHaveErrors();
+
+    $attachments = NewsPost::sole()->attachments;
+
+    expect($attachments->pluck('name')->all())->toBe(['poster.png', 'launch.mp4']);
+    expect($attachments->pluck('mime_type')->all())->toBe(['image/png', 'video/mp4']);
+    expect($attachments->last()->size)->toBe(2048 * 1024);
+    Storage::disk(NewsAttachment::DISK)->assertExists($attachments->pluck('path')->all());
+});
+
+test('publishing a post rejects :description as an attachment', function (Closure $attachments, string $field, string $message) {
+    Storage::fake(NewsAttachment::DISK);
+
+    $this->actingAs(User::factory()->admin()->create())
+        ->post(route('news.store'), newsPayload(['attachments' => $attachments()]))
+        ->assertSessionHasErrors([$field => $message]);
+
+    expect(NewsPost::count())->toBe(0);
+})->with([
+    'a file that is neither an image nor a video' => [
+        fn (): array => [UploadedFile::fake()->create('notes.pdf', 100, 'application/pdf')],
+        'attachments.0',
+        'Each attachment must be a JPG, PNG, GIF or WebP image, or an MP4 or WebM video.',
+    ],
+    'a video in a format browsers cannot play' => [
+        fn (): array => [UploadedFile::fake()->create('clip.avi', 100, 'video/x-msvideo')],
+        'attachments.0',
+        'Each attachment must be a JPG, PNG, GIF or WebP image, or an MP4 or WebM video.',
+    ],
+    'an image over 5 MB' => [
+        fn (): array => [UploadedFile::fake()->image('huge.png')->size(NewsAttachment::MAX_IMAGE_KILOBYTES + 1)],
+        'attachments.0',
+        'Each image must be 5 MB or smaller.',
+    ],
+    'a video over 50 MB' => [
+        fn (): array => [UploadedFile::fake()->create('long.mp4', NewsAttachment::MAX_VIDEO_KILOBYTES + 1, 'video/mp4')],
+        'attachments.0',
+        'Each video must be 50 MB or smaller.',
+    ],
+    'more than ten files' => [
+        fn (): array => array_map(fn (int $number) => UploadedFile::fake()->image("photo-{$number}.png"), range(1, 11)),
+        'attachments',
+        'You can attach up to 10 files.',
+    ],
+]);
+
+test('the edit form lists the photos and videos already on the post', function () {
+    $post = NewsPost::factory()->create();
+    $photo = NewsAttachment::factory()->for($post, 'post')->create(['name' => 'poster.png']);
+    $video = NewsAttachment::factory()->video()->for($post, 'post')->create(['name' => 'launch.mp4']);
+
+    $this->actingAs(User::factory()->admin()->create())
+        ->get(route('news.edit', $post))
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('post.attachments', 2)
+            ->where('post.attachments.0.id', $photo->id)
+            ->where('post.attachments.0.type', 'image')
+            ->where('post.attachments.0.name', 'poster.png')
+            ->where('post.attachments.1.id', $video->id)
+            ->where('post.attachments.1.type', 'video')
+            ->where('post.attachments.1.name', 'launch.mp4'));
+});
+
+test('an administrator can add photos and videos while editing a post', function () {
+    Storage::fake(NewsAttachment::DISK);
+    $post = NewsPost::factory()->create();
+    NewsAttachment::factory()->for($post, 'post')->create(['name' => 'before.png']);
+
+    $this->actingAs(User::factory()->admin()->create())
+        ->put(route('news.update', $post), newsPayload(['attachments' => [UploadedFile::fake()->create('after.webm', 512, 'video/webm')]]))
+        ->assertRedirect(route('news.show', $post))
+        ->assertSessionDoesntHaveErrors();
+
+    $attachments = $post->attachments()->get();
+
+    expect($attachments->pluck('name')->all())->toBe(['before.png', 'after.webm']);
+    expect($attachments->last()->mime_type)->toBe('video/webm');
+    Storage::disk(NewsAttachment::DISK)->assertExists($attachments->last()->path);
+});
+
+test('editing cannot push a post past ten files', function () {
+    Storage::fake(NewsAttachment::DISK);
+    $post = NewsPost::factory()->create();
+    NewsAttachment::factory(9)->for($post, 'post')->create();
+
+    $this->actingAs(User::factory()->admin()->create())
+        ->put(route('news.update', $post), newsPayload(['attachments' => [UploadedFile::fake()->image('ten.png'), UploadedFile::fake()->image('eleven.png')]]))
+        ->assertSessionHasErrors(['attachments' => 'A post can hold up to 10 files, and this one already has 9.']);
+
+    expect($post->attachments()->count())->toBe(9);
+});
+
+test('a post page lists its photos and videos', function () {
+    $post = NewsPost::factory()->create();
+    $video = NewsAttachment::factory()->video()->for($post, 'post')->create(['name' => 'launch.mp4', 'size' => 3 * 1024 * 1024]);
+
+    $this->actingAs(User::factory()->create())
+        ->get(route('news.show', $post))
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('post.attachments', 1)
+            ->where('post.attachments.0.id', $video->id)
+            ->where('post.attachments.0.type', 'video')
+            ->where('post.attachments.0.name', 'launch.mp4')
+            ->where('post.attachments.0.mime_type', 'video/mp4')
+            ->where('post.attachments.0.size', '3 MB')
+            ->where('post.attachments.0.url', route('news.attachments.show', [$post, $video])));
+});
+
+test('the news shows the first photo of a post as its cover', function () {
+    $post = NewsPost::factory()->create();
+    NewsAttachment::factory()->video()->for($post, 'post')->create();
+    $firstPhoto = NewsAttachment::factory()->for($post, 'post')->create();
+    NewsAttachment::factory()->for($post, 'post')->create();
+    $bare = NewsPost::factory()->create(['published_at' => now()->subYear()]);
+
+    $this->actingAs(User::factory()->create())
+        ->get(route('news.index'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('posts.data.0.id', $post->id)
+            ->where('posts.data.0.cover_url', route('news.attachments.show', [$post, $firstPhoto]))
+            ->where('posts.data.1.id', $bare->id)
+            ->where('posts.data.1.cover_url', null));
 });
