@@ -33,9 +33,10 @@ const selectClasses =
             <TextAreaField id="body" name="body" label="Message" :rows="8" :initial-value="thread.body" :error="errors.body" required />
 
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div class="flex flex-col gap-1.5">
+                <div v-if="topics.length > 0" class="flex flex-col gap-1.5">
                     <label for="forum_topic_id" class="text-sm font-medium text-gray-700 dark:text-gray-300">Topic</label>
-                    <select id="forum_topic_id" name="forum_topic_id" required :class="selectClasses">
+                    <select id="forum_topic_id" name="forum_topic_id" :class="selectClasses">
+                        <option value="" :selected="thread.forum_topic_id === null">No topic</option>
                         <option v-for="topic in topics" :key="topic.id" :value="topic.id" :selected="topic.id === thread.forum_topic_id">{{ topic.name }}</option>
                     </select>
                     <p v-if="errors.forum_topic_id" class="text-sm text-red-600 dark:text-red-400">{{ errors.forum_topic_id }}</p>

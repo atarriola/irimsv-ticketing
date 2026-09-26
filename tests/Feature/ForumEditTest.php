@@ -47,6 +47,18 @@ test('an author can update their thread and move it to another topic', function 
     expect($thread->is_pinned)->toBeFalse();
 });
 
+test('an author can take their thread out of its topic', function () {
+    $author = User::factory()->create();
+    $thread = ForumThread::factory()->for($author, 'author')->create();
+
+    $this->actingAs($author)
+        ->put(route('forum.threads.update', $thread), ['forum_topic_id' => '', 'type' => 'query', 'body' => 'Updated message'])
+        ->assertRedirect(route('forum.threads.show', $thread))
+        ->assertSessionDoesntHaveErrors();
+
+    expect($thread->fresh()->forum_topic_id)->toBeNull();
+});
+
 test('updating a thread validates its content', function () {
     $author = User::factory()->create();
     $thread = ForumThread::factory()->for($author, 'author')->create(['body' => 'Original message']);

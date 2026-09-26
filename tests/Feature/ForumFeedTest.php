@@ -42,6 +42,39 @@ test('the feed shows every thread with its author, their position and photo, top
             ->where('threads.data.0.replies_count', 2));
 });
 
+test('the feed shows threads posted without a topic, and leaves them out when narrowed to one', function () {
+    $topic = ForumTopic::factory()->create(['slug' => 'help']);
+    ForumThread::factory()->for($topic, 'topic')->create();
+    $untopicked = ForumThread::factory()->withoutTopic()->create();
+
+    $this->actingAs(User::factory()->create())
+        ->get(route('forum.index'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('threads.data', 2)
+            ->where('threads.data.0.id', $untopicked->id)
+            ->where('threads.data.0.topic', null));
+
+    $this->actingAs(User::factory()->create())
+        ->get(route('forum.index', ['topic' => 'help']))
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('threads.data', 1)
+            ->where('threads.data.0.topic.slug', 'help'));
+});
+
+test('anyone can post while no topics exist yet', function () {
+    $this->actingAs(User::factory()->create())
+        ->get(route('forum.index'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('topics', 0)
+            ->where('can.create', true));
+
+    $this->actingAs(User::factory()->create())
+        ->post(route('forum.threads.store'), ['type' => 'query', 'body' => 'First post!'])
+        ->assertRedirect(route('forum.index'));
+
+    expect(ForumThread::sole()->forum_topic_id)->toBeNull();
+});
+
 test('the feed shows pinned threads first and then the most recently active', function () {
     $quiet = ForumThread::factory()->create(['last_activity_at' => now()->subDays(3)]);
     $active = ForumThread::factory()->create(['last_activity_at' => now()->subHour()]);

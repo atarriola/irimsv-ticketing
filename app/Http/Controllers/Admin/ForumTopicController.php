@@ -21,7 +21,7 @@ class ForumTopicController extends Controller
         'singular' => 'topic',
         'plural' => 'Forum topics',
         'baseUrl' => '/admin/forum-topics',
-        'description' => 'Topics are the boards that forum threads are started in.',
+        'description' => 'Topics are optional labels a forum thread can be filed under. Without any, threads are simply posted to the feed.',
         'countLabel' => 'threads',
         'hasPosition' => true,
         'deleteWarning' => 'A topic can only be deleted once it has no threads.',

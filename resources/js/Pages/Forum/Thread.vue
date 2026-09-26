@@ -77,7 +77,7 @@ function deleteThread() {
 
                 <footer class="flex flex-wrap items-center justify-between gap-3">
                     <span class="flex flex-wrap items-center gap-2">
-                        <Link :href="`/forum?topic=${thread.topic.slug}`" :class="tagClasses" class="hover:text-gray-900 dark:hover:text-gray-100">{{ thread.topic.name }}</Link>
+                        <Link v-if="thread.topic" :href="`/forum?topic=${thread.topic.slug}`" :class="tagClasses" class="hover:text-gray-900 dark:hover:text-gray-100">{{ thread.topic.name }}</Link>
                         <span :class="tagClasses">{{ thread.type }}</span>
                         <span v-if="post.is_pinned" :class="tagClasses">Pinned</span>
                         <span v-if="post.is_locked" :class="tagClasses">Locked</span>

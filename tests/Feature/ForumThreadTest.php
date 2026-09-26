@@ -62,14 +62,33 @@ test('a user cannot pin, lock or reassign a thread while starting it', function 
     expect($thread->user_id)->toBe($user->id);
 });
 
-test('starting a thread requires a topic, type and message', function () {
+test('a user can post a thread without filing it under a topic', function (array $payload) {
+    $user = User::factory()->create();
+    ForumTopic::factory()->create();
+
+    $this->actingAs($user)
+        ->post(route('forum.threads.store'), ['type' => 'query', 'body' => 'Is anyone else locked out?', ...$payload])
+        ->assertRedirect(route('forum.index'))
+        ->assertSessionDoesntHaveErrors();
+
+    $thread = ForumThread::sole();
+
+    expect($thread->forum_topic_id)->toBeNull();
+    expect($thread->body)->toBe('Is anyone else locked out?');
+})->with([
+    'no topic chosen' => [['forum_topic_id' => '']],
+    'no topic field at all' => [[]],
+]);
+
+test('starting a thread requires a type and message, but not a topic', function () {
     $response = $this->actingAs(User::factory()->create())->post(route('forum.threads.store'), []);
 
-    $response->assertSessionHasErrors([
-        'forum_topic_id' => 'The topic field is required.',
-        'type' => 'The type field is required.',
-        'body' => 'The message field is required.',
-    ]);
+    $response
+        ->assertSessionHasErrors([
+            'type' => 'The type field is required.',
+            'body' => 'The message field is required.',
+        ])
+        ->assertSessionDoesntHaveErrors('forum_topic_id');
     expect(ForumThread::count())->toBe(0);
 });
 
@@ -112,6 +131,15 @@ test('a thread page shows the thread, its comments in order with their replies a
             ->where('nextCommentsPage', null)
             ->where('can.moderate', false)
             ->where('can.delete', true));
+});
+
+test('a thread page shows no topic when the thread was posted without one', function () {
+    $thread = ForumThread::factory()->withoutTopic()->create();
+
+    $this->actingAs(User::factory()->create())
+        ->get(route('forum.threads.show', $thread))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->where('thread.topic', null));
 });
 
 test('a thread page offers a second page once there are more than twenty comments', function () {

@@ -82,7 +82,7 @@ defineExpose({ syncConversation, applyActivity });
                 </button>
 
                 <span class="flex flex-wrap items-center gap-2">
-                    <span :class="tagClasses">{{ thread.topic.name }}</span>
+                    <span v-if="thread.topic" :class="tagClasses">{{ thread.topic.name }}</span>
                     <span :class="tagClasses">{{ thread.type }}</span>
                     <span v-if="post.is_pinned" :class="tagClasses">Pinned</span>
                     <span v-if="post.is_locked" :class="tagClasses">Locked</span>

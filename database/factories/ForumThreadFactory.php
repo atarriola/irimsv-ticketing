@@ -29,6 +29,16 @@ class ForumThreadFactory extends Factory
     }
 
     /**
+     * Indicate that the thread was posted without being filed under a topic.
+     */
+    public function withoutTopic(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'forum_topic_id' => null,
+        ]);
+    }
+
+    /**
      * Indicate that the thread is pinned to the top of the forum.
      */
     public function pinned(): static

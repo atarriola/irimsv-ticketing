@@ -24,7 +24,7 @@ class ForumThreadResource extends JsonResource
             'body' => $this->body,
             'excerpt' => $this->excerpt,
             'type' => $this->type->label(),
-            'topic' => $this->topic->only(['name', 'slug']),
+            'topic' => $this->topic?->only(['name', 'slug']),
             'author' => $this->author->name,
             'author_position' => $this->author->position,
             'author_photo_url' => $this->author->photo_url,

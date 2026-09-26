@@ -27,7 +27,7 @@ class StoreForumThreadRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'forum_topic_id' => ['required', 'integer', Rule::exists(ForumTopic::class, 'id')],
+            'forum_topic_id' => ['nullable', 'integer', Rule::exists(ForumTopic::class, 'id')],
             'type' => ['required', Rule::enum(ForumThreadType::class)],
             'body' => ['required', 'string', 'max:5000'],
         ];

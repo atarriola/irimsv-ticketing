@@ -26,7 +26,8 @@ const CHECK_FOR_POSTS_EVERY_MS = hasSocket ? 30000 : 10000;
 
 const page = usePage();
 const user = computed(() => page.props.auth.user);
-const defaultTopicId = computed(() => (props.topics.find((topic) => topic.slug === props.currentTopic) ?? props.topics[0])?.id);
+// A new post is filed under the topic the feed is narrowed to, and under none otherwise.
+const defaultTopicId = computed(() => props.topics.find((topic) => topic.slug === props.currentTopic)?.id ?? null);
 const feedUrl = computed(() => (props.currentTopic ? `/forum?topic=${props.currentTopic}` : '/forum'));
 
 // The newest thread the feed showed when it was last loaded; the server counts what was posted after it.
@@ -89,7 +90,7 @@ const pillSelectClasses =
         <h1 class="text-2xl font-semibold tracking-tight">Forum</h1>
 
         <Form
-            v-if="can.create && topics.length > 0"
+            v-if="can.create"
             action="/forum/threads"
             method="post"
             reset-on-success
@@ -114,10 +115,13 @@ const pillSelectClasses =
 
                 <div class="flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 pt-3 dark:border-gray-800">
                     <span class="flex flex-wrap gap-2">
-                        <label for="forum_topic_id" class="sr-only">Topic</label>
-                        <select id="forum_topic_id" name="forum_topic_id" class="max-w-40 truncate" :class="pillSelectClasses">
-                            <option v-for="topic in topics" :key="topic.id" :value="topic.id" :selected="topic.id === defaultTopicId">{{ topic.name }}</option>
-                        </select>
+                        <template v-if="topics.length > 0">
+                            <label for="forum_topic_id" class="sr-only">Topic</label>
+                            <select id="forum_topic_id" name="forum_topic_id" class="max-w-40 truncate" :class="pillSelectClasses">
+                                <option value="" :selected="defaultTopicId === null">No topic</option>
+                                <option v-for="topic in topics" :key="topic.id" :value="topic.id" :selected="topic.id === defaultTopicId">{{ topic.name }}</option>
+                            </select>
+                        </template>
                         <label for="type" class="sr-only">Kind of post</label>
                         <select id="type" name="type" :class="pillSelectClasses">
                             <option v-for="type in types" :key="type.value" :value="type.value" :selected="type.value === 'query'">{{ type.label }}</option>
@@ -133,10 +137,6 @@ const pillSelectClasses =
                 </div>
             </div>
         </Form>
-
-        <p v-else-if="topics.length === 0" class="rounded-lg border border-dashed border-gray-300 bg-white px-6 py-8 text-center text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400">
-            An administrator needs to add a forum topic before anyone can post.
-        </p>
 
         <nav v-if="topics.length > 0" class="flex gap-2 overflow-x-auto pb-1" aria-label="Topics">
             <Link
