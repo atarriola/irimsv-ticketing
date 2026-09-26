@@ -5,8 +5,11 @@ use App\Enums\TicketStatus;
 use App\Enums\TicketType;
 use App\Models\Category;
 use App\Models\Ticket;
+use App\Models\TicketAttachment;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 
 uses(RefreshDatabase::class);
@@ -117,4 +120,49 @@ test('raising a ticket rejects :field with an invalid value', function (string $
     'an unknown priority' => ['priority', 'urgent', 'The selected priority is invalid.'],
     'a missing category' => ['category_id', 999, 'The selected category is invalid.'],
     'an overlong subject' => ['subject', str_repeat('a', 256), 'The subject field must not be greater than 255 characters.'],
+]);
+
+test('a user can attach screenshots when raising a ticket', function () {
+    Storage::fake(TicketAttachment::DISK);
+    $user = User::factory()->create();
+
+    $this->actingAs($user)
+        ->post(route('tickets.store'), ticketPayload([
+            'attachments' => [UploadedFile::fake()->image('error.png', 800, 600), UploadedFile::fake()->image('console.jpg')],
+        ]))
+        ->assertSessionDoesntHaveErrors();
+
+    $attachments = Ticket::sole()->attachments;
+
+    expect($attachments->pluck('name')->all())->toBe(['error.png', 'console.jpg']);
+    expect($attachments->first()->user_id)->toBe($user->id);
+    expect($attachments->first()->mime_type)->toBe('image/png');
+    expect($attachments->first()->size)->toBeGreaterThan(0);
+    Storage::disk(TicketAttachment::DISK)->assertExists($attachments->pluck('path')->all());
+});
+
+test('raising a ticket rejects :description', function (Closure $attachments, string $field, string $message) {
+    Storage::fake(TicketAttachment::DISK);
+
+    $this->actingAs(User::factory()->create())
+        ->post(route('tickets.store'), ticketPayload(['attachments' => $attachments()]))
+        ->assertSessionHasErrors([$field => $message]);
+
+    expect(Ticket::count())->toBe(0);
+})->with([
+    'a file that is not an image' => [
+        fn (): array => [UploadedFile::fake()->create('notes.pdf', 100, 'application/pdf')],
+        'attachments.0',
+        'Each attachment must be a JPG, PNG, GIF or WebP image.',
+    ],
+    'an image over 5 MB' => [
+        fn (): array => [UploadedFile::fake()->image('huge.png')->size(TicketAttachment::MAX_KILOBYTES + 1)],
+        'attachments.0',
+        'Each image must be 5 MB or smaller.',
+    ],
+    'more than five images' => [
+        fn (): array => array_map(fn (int $number) => UploadedFile::fake()->image("shot-{$number}.png"), range(1, 6)),
+        'attachments',
+        'You can attach up to 5 images.',
+    ],
 ]);

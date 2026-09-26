@@ -179,4 +179,14 @@ class User extends Authenticatable
     {
         return $this->hasMany(ForumThread::class);
     }
+
+    /**
+     * Get the news posts written by the user.
+     *
+     * @return HasMany<NewsPost, $this>
+     */
+    public function newsPosts(): HasMany
+    {
+        return $this->hasMany(NewsPost::class);
+    }
 }

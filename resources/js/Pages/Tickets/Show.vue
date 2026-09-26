@@ -70,6 +70,26 @@ function deleteTicket() {
                     <p class="text-sm leading-relaxed break-words whitespace-pre-line text-gray-800 dark:text-gray-200">{{ ticket.description }}</p>
                 </section>
 
+                <section v-if="ticket.attachments.length > 0" class="flex flex-col gap-2">
+                    <h2 class="text-sm font-semibold">Screenshots</h2>
+                    <ul class="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                        <li v-for="attachment in ticket.attachments" :key="attachment.id">
+                            <a :href="attachment.url" target="_blank" rel="noopener" class="flex flex-col gap-1.5">
+                                <img
+                                    :src="attachment.url"
+                                    :alt="attachment.name"
+                                    loading="lazy"
+                                    class="aspect-video w-full rounded-lg border border-gray-200 bg-gray-50 object-cover transition hover:opacity-90 dark:border-gray-700 dark:bg-gray-800"
+                                />
+                                <span class="flex items-baseline justify-between gap-2 text-xs text-gray-500 dark:text-gray-400">
+                                    <span class="truncate">{{ attachment.name }}</span>
+                                    <span class="shrink-0">{{ attachment.size }}</span>
+                                </span>
+                            </a>
+                        </li>
+                    </ul>
+                </section>
+
                 <TicketConversation :ticket-id="ticket.id" :initial-messages="comments" :can-comment="can.comment" />
             </div>
 

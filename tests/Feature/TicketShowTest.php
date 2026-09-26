@@ -2,6 +2,7 @@
 
 use App\Enums\TicketType;
 use App\Models\Ticket;
+use App\Models\TicketAttachment;
 use App\Models\TicketComment;
 use App\Models\User;
 use App\Models\Usertype;
@@ -9,6 +10,21 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
 
 uses(RefreshDatabase::class);
+
+test('a ticket page lists the screenshots attached to it', function () {
+    $requester = User::factory()->create();
+    $ticket = Ticket::factory()->for($requester, 'requester')->create();
+    $attachment = TicketAttachment::factory()->for($ticket)->create(['name' => 'error.png', 'size' => 1536]);
+
+    $this->actingAs($requester)
+        ->get(route('tickets.show', $ticket))
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('ticket.attachments', 1)
+            ->where('ticket.attachments.0.id', $attachment->id)
+            ->where('ticket.attachments.0.name', 'error.png')
+            ->where('ticket.attachments.0.size', '2 KB')
+            ->where('ticket.attachments.0.url', route('tickets.attachments.show', [$ticket, $attachment])));
+});
 
 test('a guest is sent to the login page when opening a ticket', function () {
     $ticket = Ticket::factory()->create();

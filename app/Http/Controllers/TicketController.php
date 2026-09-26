@@ -8,10 +8,12 @@ use App\Enums\TicketStatus;
 use App\Enums\TicketType;
 use App\Http\Requests\StoreTicketRequest;
 use App\Http\Requests\UpdateTicketRequest;
+use App\Http\Resources\TicketAttachmentResource;
 use App\Http\Resources\TicketCommentResource;
 use App\Http\Resources\TicketResource;
 use App\Models\Category;
 use App\Models\Ticket;
+use App\Models\TicketAttachment;
 use App\Models\TicketComment;
 use App\Models\User;
 use BackedEnum;
@@ -127,7 +129,9 @@ class TicketController extends Controller
      */
     public function store(StoreTicketRequest $request): RedirectResponse
     {
-        $ticket = $request->user()->tickets()->create($request->validated());
+        $ticket = $request->user()->tickets()->create($request->safe()->except('attachments'));
+
+        $this->attachImages($ticket, $request);
 
         Inertia::flash('toast', ['type' => 'success', 'message' => "{$ticket->key} has been created."]);
 
@@ -142,7 +146,7 @@ class TicketController extends Controller
         Gate::authorize('view', $ticket);
 
         $user = $request->user();
-        $ticket->load(['requester:'.User::DISPLAY_COLUMNS.',email', 'category:id,name']);
+        $ticket->load(['requester:'.User::DISPLAY_COLUMNS.',email', 'category:id,name', 'attachments']);
 
         $comments = $ticket->comments()
             ->with('author:'.User::DISPLAY_COLUMNS)
@@ -168,6 +172,7 @@ class TicketController extends Controller
                 'updated_at' => $ticket->updated_at->diffForHumans(),
                 'resolved_at' => $ticket->resolved_at?->toDayDateTimeString(),
                 'closed_at' => $ticket->closed_at?->toDayDateTimeString(),
+                'attachments' => $this->attachmentsFor($ticket, $request),
             ],
             'comments' => $comments,
             'statuses' => $this->options(TicketStatus::cases()),
@@ -183,9 +188,11 @@ class TicketController extends Controller
     /**
      * Display the form for editing a ticket's details.
      */
-    public function edit(Ticket $ticket): Response
+    public function edit(Request $request, Ticket $ticket): Response
     {
         Gate::authorize('update', $ticket);
+
+        $ticket->load('attachments');
 
         return Inertia::render('Tickets/Edit', [
             ...$this->formOptions(),
@@ -197,16 +204,19 @@ class TicketController extends Controller
                 'category_id' => $ticket->category_id,
                 'subject' => $ticket->subject,
                 'description' => $ticket->description,
+                'attachments' => $this->attachmentsFor($ticket, $request),
             ],
         ]);
     }
 
     /**
-     * Update a ticket's details.
+     * Update a ticket's details, adding any images sent along.
      */
     public function update(UpdateTicketRequest $request, Ticket $ticket): RedirectResponse
     {
-        $ticket->update($request->validated());
+        $ticket->update($request->safe()->except('attachments'));
+
+        $this->attachImages($ticket, $request);
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'The ticket has been updated.']);
 
@@ -226,6 +236,28 @@ class TicketController extends Controller
         Inertia::flash('toast', ['type' => 'success', 'message' => "{$ticket->key} has been deleted."]);
 
         return redirect()->route('tickets.index', ['group' => $group->value]);
+    }
+
+    /**
+     * Keep the images sent with the form on the ticket.
+     */
+    private function attachImages(Ticket $ticket, StoreTicketRequest $request): void
+    {
+        foreach ($request->validated('attachments') ?? [] as $file) {
+            $ticket->addAttachment($file, $request->user());
+        }
+    }
+
+    /**
+     * Describe the ticket's images for the client.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function attachmentsFor(Ticket $ticket, Request $request): array
+    {
+        return $ticket->attachments
+            ->map(fn (TicketAttachment $attachment): array => TicketAttachmentResource::make($attachment)->resolve($request))
+            ->all();
     }
 
     /**

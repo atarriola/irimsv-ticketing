@@ -38,7 +38,13 @@ const ticketGroups = computed(() => [
 const sections = computed(() => [
     { heading: null, items: [{ label: 'Dashboard', href: '/dashboard', icon: 'dashboard', isCurrent: startsWith('/dashboard') }] },
     { heading: 'Tickets', items: ticketGroups.value },
-    { heading: 'Community', items: [{ label: 'Forum', href: '/forum', icon: 'forum', isCurrent: startsWith('/forum') }] },
+    {
+        heading: 'Community',
+        items: [
+            { label: 'News', href: '/news', icon: 'news', isCurrent: startsWith('/news') },
+            { label: 'Forum', href: '/forum', icon: 'forum', isCurrent: startsWith('/forum') },
+        ],
+    },
     ...(user.value.is_admin
         ? [
               {

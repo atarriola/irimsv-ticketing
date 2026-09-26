@@ -12,8 +12,10 @@ use App\Http\Controllers\ForumThreadChangeController;
 use App\Http\Controllers\ForumThreadController;
 use App\Http\Controllers\ForumThreadModerationController;
 use App\Http\Controllers\ForumThreadReactionController;
+use App\Http\Controllers\NewsPostController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\NotificationReadController;
+use App\Http\Controllers\TicketAttachmentController;
 use App\Http\Controllers\TicketCommentController;
 use App\Http\Controllers\TicketController;
 use App\Http\Controllers\TicketStatusController;
@@ -34,6 +36,10 @@ Route::middleware('auth')->group(function () {
     Route::get('/tickets/{ticket}/comments', [TicketCommentController::class, 'index'])->whereNumber('ticket')->name('tickets.comments.index');
     Route::post('/tickets/{ticket}/comments', [TicketCommentController::class, 'store'])->whereNumber('ticket')->middleware('throttle:posting')->name('tickets.comments.store');
     Route::delete('/ticket-comments/{comment}', [TicketCommentController::class, 'destroy'])->whereNumber('comment')->name('ticket-comments.destroy');
+    Route::get('/tickets/{ticket}/attachments/{attachment}', [TicketAttachmentController::class, 'show'])->whereNumber(['ticket', 'attachment'])->scopeBindings()->name('tickets.attachments.show');
+    Route::delete('/tickets/{ticket}/attachments/{attachment}', [TicketAttachmentController::class, 'destroy'])->whereNumber(['ticket', 'attachment'])->scopeBindings()->name('tickets.attachments.destroy');
+
+    Route::resource('news', NewsPostController::class)->parameters(['news' => 'post'])->whereNumber('post');
 
     Route::get('/account', AccountController::class)->name('account.show');
 

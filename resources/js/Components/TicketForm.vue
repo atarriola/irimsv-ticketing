@@ -1,6 +1,7 @@
 <script setup>
 import { Form, Link } from '@inertiajs/vue3';
 import FormField from '@/Components/FormField.vue';
+import ImageAttachmentsField from '@/Components/ImageAttachmentsField.vue';
 import SubmitButton from '@/Components/SubmitButton.vue';
 import TextAreaField from '@/Components/TextAreaField.vue';
 
@@ -21,6 +22,11 @@ const typeDescriptions = {
     feature_request: 'An idea for something new or improved.',
 };
 
+// The first complaint about the images, whether about the set as a whole or about one file.
+function attachmentError(errors) {
+    return errors.attachments ?? Object.entries(errors).find(([key]) => key.startsWith('attachments.'))?.[1];
+}
+
 const selectClasses =
     'w-full rounded-lg border border-gray-300 bg-white px-3.5 py-2.5 text-sm text-gray-900 transition outline-none focus:border-gray-900 focus:ring-1 focus:ring-gray-900 dark:focus:border-gray-100 dark:focus:ring-gray-100 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100';
 
@@ -31,10 +37,13 @@ const choiceClasses =
 <template>
     <Form
         :action="action"
-        :method="method"
+        method="post"
         class="flex flex-col gap-6 rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-900"
         #default="{ errors, processing }"
     >
+        <!-- Images travel as multipart form data, which only a POST can carry; Laravel reads the real method from _method. -->
+        <input v-if="method !== 'post'" type="hidden" name="_method" :value="method" />
+
         <fieldset class="flex flex-col gap-2">
             <legend class="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">What kind of ticket is this?</legend>
             <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -78,6 +87,8 @@ const choiceClasses =
             :error="errors.description"
             required
         />
+
+        <ImageAttachmentsField :existing="ticket.attachments ?? []" :ticket-id="ticket.id ?? null" :error="attachmentError(errors)" />
 
         <div class="flex items-center justify-end gap-3">
             <Link :href="cancelHref" class="rounded-lg px-4 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800">Cancel</Link>

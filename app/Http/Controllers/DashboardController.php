@@ -6,8 +6,10 @@ use App\Enums\TicketPriority;
 use App\Enums\TicketStatus;
 use App\Enums\TicketType;
 use App\Http\Resources\ForumThreadResource;
+use App\Http\Resources\NewsPostResource;
 use App\Http\Resources\TicketResource;
 use App\Models\ForumThread;
+use App\Models\NewsPost;
 use App\Models\Ticket;
 use App\Models\User;
 use BackedEnum;
@@ -31,7 +33,24 @@ class DashboardController extends Controller
             'typeCounts' => $this->countsBy(Ticket::visibleTo($user)->active(), 'type', TicketType::cases()),
             'recentTickets' => $this->recentTickets($request),
             'recentThreads' => $this->recentThreads($request),
+            'latestNews' => $this->latestNews($request),
         ]);
+    }
+
+    /**
+     * Get the latest published news.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function latestNews(Request $request): array
+    {
+        return NewsPost::published()
+            ->with('author:'.User::DISPLAY_COLUMNS)
+            ->newestFirst()
+            ->limit(3)
+            ->get()
+            ->map(fn (NewsPost $post): array => NewsPostResource::make($post)->resolve($request))
+            ->all();
     }
 
     /**

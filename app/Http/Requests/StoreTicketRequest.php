@@ -6,6 +6,7 @@ use App\Enums\TicketPriority;
 use App\Enums\TicketType;
 use App\Models\Category;
 use App\Models\Ticket;
+use App\Models\TicketAttachment;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -33,6 +34,8 @@ class StoreTicketRequest extends FormRequest
             'category_id' => ['nullable', 'integer', Rule::exists(Category::class, 'id')],
             'subject' => ['required', 'string', 'max:255'],
             'description' => ['required', 'string', 'max:5000'],
+            'attachments' => ['nullable', 'array', 'max:'.TicketAttachment::MAX_PER_TICKET],
+            'attachments.*' => ['required', 'image', 'mimes:jpg,jpeg,png,gif,webp', 'max:'.TicketAttachment::MAX_KILOBYTES],
         ];
     }
 
@@ -45,6 +48,23 @@ class StoreTicketRequest extends FormRequest
     {
         return [
             'category_id' => 'category',
+            'attachments' => 'images',
+            'attachments.*' => 'image',
+        ];
+    }
+
+    /**
+     * Get the error messages for the defined validation rules.
+     *
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'attachments.max' => 'You can attach up to :max images.',
+            'attachments.*.image' => 'Each attachment must be a JPG, PNG, GIF or WebP image.',
+            'attachments.*.mimes' => 'Each attachment must be a JPG, PNG, GIF or WebP image.',
+            'attachments.*.max' => 'Each image must be '.(TicketAttachment::MAX_KILOBYTES / 1024).' MB or smaller.',
         ];
     }
 }

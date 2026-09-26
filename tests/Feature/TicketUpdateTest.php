@@ -4,12 +4,71 @@ use App\Enums\TicketPriority;
 use App\Enums\TicketStatus;
 use App\Enums\TicketType;
 use App\Models\Ticket;
+use App\Models\TicketAttachment;
 use App\Models\TicketComment;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 
 uses(RefreshDatabase::class);
+
+test('the edit form lists the screenshots already on the ticket', function () {
+    $requester = User::factory()->create();
+    $ticket = Ticket::factory()->for($requester, 'requester')->create();
+    $attachment = TicketAttachment::factory()->for($ticket)->create(['name' => 'before.png']);
+
+    $this->actingAs($requester)
+        ->get(route('tickets.edit', $ticket))
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('ticket.attachments', 1)
+            ->where('ticket.attachments.0.id', $attachment->id)
+            ->where('ticket.attachments.0.name', 'before.png'));
+});
+
+test('a requester can add screenshots while editing their ticket', function () {
+    Storage::fake(TicketAttachment::DISK);
+    $requester = User::factory()->create();
+    $ticket = Ticket::factory()->for($requester, 'requester')->create();
+    TicketAttachment::factory()->for($ticket)->create(['name' => 'before.png']);
+
+    $this->actingAs($requester)
+        ->put(route('tickets.update', $ticket), [
+            'type' => 'bug_report',
+            'priority' => 'low',
+            'subject' => 'Still broken',
+            'description' => 'Now with a screenshot.',
+            'attachments' => [UploadedFile::fake()->image('after.png')],
+        ])
+        ->assertRedirect(route('tickets.show', $ticket))
+        ->assertSessionDoesntHaveErrors();
+
+    $attachments = $ticket->attachments()->get();
+
+    expect($attachments->pluck('name')->all())->toBe(['before.png', 'after.png']);
+    expect($attachments->last()->user_id)->toBe($requester->id);
+    Storage::disk(TicketAttachment::DISK)->assertExists($attachments->last()->path);
+});
+
+test('editing cannot push a ticket past five images', function () {
+    Storage::fake(TicketAttachment::DISK);
+    $requester = User::factory()->create();
+    $ticket = Ticket::factory()->for($requester, 'requester')->create();
+    TicketAttachment::factory(4)->for($ticket)->create();
+
+    $this->actingAs($requester)
+        ->put(route('tickets.update', $ticket), [
+            'type' => 'bug_report',
+            'priority' => 'low',
+            'subject' => 'Still broken',
+            'description' => 'Two more screenshots.',
+            'attachments' => [UploadedFile::fake()->image('five.png'), UploadedFile::fake()->image('six.png')],
+        ])
+        ->assertSessionHasErrors(['attachments' => 'A ticket can hold up to 5 images, and this one already has 4.']);
+
+    expect($ticket->attachments()->count())->toBe(4);
+});
 
 test('a requester can open the edit form for their open ticket', function () {
     $requester = User::factory()->create();

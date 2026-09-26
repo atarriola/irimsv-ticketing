@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Str;
 
 #[Fillable(['category_id', 'type', 'priority', 'subject', 'description'])]
@@ -36,6 +37,15 @@ class Ticket extends Model
         'priority' => TicketPriority::Medium->value,
         'status' => TicketStatus::Open->value,
     ];
+
+    /**
+     * Perform any actions required after the model boots.
+     */
+    protected static function booted(): void
+    {
+        // Attachments are deleted one by one, so each one's file is removed from disk too.
+        static::deleting(fn (Ticket $ticket) => $ticket->attachments()->get()->each->delete());
+    }
 
     /**
      * Get the attributes that should be cast.
@@ -81,6 +91,30 @@ class Ticket extends Model
     public function comments(): HasMany
     {
         return $this->hasMany(TicketComment::class);
+    }
+
+    /**
+     * Get the images attached to the ticket, oldest first.
+     *
+     * @return HasMany<TicketAttachment, $this>
+     */
+    public function attachments(): HasMany
+    {
+        return $this->hasMany(TicketAttachment::class)->oldest('id');
+    }
+
+    /**
+     * Keep an uploaded image with the ticket, on the attachments disk.
+     */
+    public function addAttachment(UploadedFile $file, User $uploader): TicketAttachment
+    {
+        return $this->attachments()->create([
+            'user_id' => $uploader->id,
+            'path' => $file->store("ticket-attachments/{$this->id}", TicketAttachment::DISK),
+            'name' => Str::limit($file->getClientOriginalName(), 255, ''),
+            'mime_type' => $file->getMimeType() ?? 'application/octet-stream',
+            'size' => $file->getSize(),
+        ]);
     }
 
     /**

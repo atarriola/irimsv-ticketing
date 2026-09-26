@@ -3,6 +3,7 @@ import { Head, Link, usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
 import AppIcon from '@/Components/AppIcon.vue';
 import BarList from '@/Components/BarList.vue';
+import NewsKindBadge from '@/Components/NewsKindBadge.vue';
 import PriorityIcon from '@/Components/PriorityIcon.vue';
 import StatTile from '@/Components/StatTile.vue';
 import StatusBadge from '@/Components/StatusBadge.vue';
@@ -18,6 +19,7 @@ const props = defineProps({
     typeCounts: Array,
     recentTickets: Array,
     recentThreads: Array,
+    latestNews: Array,
 });
 
 const page = usePage();
@@ -110,6 +112,26 @@ const panelLinkClasses = 'text-sm font-medium text-gray-900 underline decoration
                 <BarList title="Active tickets by type" subtitle="What people are asking for right now" :items="typeCounts" unit="active tickets" />
             </div>
         </div>
+
+        <section :class="panelClasses">
+            <header :class="panelHeaderClasses">
+                <h2 class="flex items-center gap-2 text-sm font-semibold"><AppIcon name="news" class="text-gray-400" /> Latest news</h2>
+                <Link href="/news" :class="panelLinkClasses">All news</Link>
+            </header>
+
+            <p v-if="latestNews.length === 0" class="flex flex-col items-center gap-3 px-5 py-10 text-center text-sm text-gray-500 dark:text-gray-400">
+                <AppIcon name="news" class="size-8 text-gray-300 dark:text-gray-600" />
+                Nothing announced yet.
+            </p>
+
+            <ul v-else class="grid grid-cols-1 divide-y divide-gray-100 md:grid-cols-3 md:divide-x md:divide-y-0 dark:divide-gray-800">
+                <li v-for="post in latestNews" :key="post.id" class="flex flex-col gap-2 px-5 py-4">
+                    <span class="flex flex-wrap items-center gap-2 text-xs text-gray-500 dark:text-gray-400"><NewsKindBadge :kind="post.kind" /> {{ post.published_on }}</span>
+                    <Link :href="`/news/${post.id}`" class="line-clamp-2 text-sm font-semibold underline-offset-4 hover:underline">{{ post.title }}</Link>
+                    <span class="line-clamp-2 text-sm text-gray-600 dark:text-gray-400">{{ post.excerpt }}</span>
+                </li>
+            </ul>
+        </section>
 
         <section :class="panelClasses">
             <header :class="panelHeaderClasses">

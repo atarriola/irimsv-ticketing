@@ -4,6 +4,7 @@ use App\Enums\TicketPriority;
 use App\Enums\TicketType;
 use App\Models\ForumReply;
 use App\Models\ForumThread;
+use App\Models\NewsPost;
 use App\Models\Ticket;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -94,4 +95,20 @@ test('the dashboard lists the latest forum threads with their reply counts', fun
             ->where('recentThreads.0.excerpt', 'Is the portal down?')
             ->where('recentThreads.0.replies_count', 3)
             ->where('recentThreads.0.is_pinned', true));
+});
+
+test('the dashboard shows the three latest published news posts', function () {
+    NewsPost::factory()->draft()->create(['title' => 'Still a draft']);
+    NewsPost::factory()->create(['title' => 'Oldest', 'published_at' => now()->subDays(4)]);
+    NewsPost::factory()->create(['title' => 'Third', 'published_at' => now()->subDays(3)]);
+    NewsPost::factory()->create(['title' => 'Second', 'published_at' => now()->subDays(2)]);
+    NewsPost::factory()->create(['title' => 'Newest', 'published_at' => now()->subDay()]);
+
+    $this->actingAs(User::factory()->admin()->create())
+        ->get(route('dashboard'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('latestNews', 3)
+            ->where('latestNews.0.title', 'Newest')
+            ->where('latestNews.1.title', 'Second')
+            ->where('latestNews.2.title', 'Third'));
 });
