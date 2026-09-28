@@ -7,6 +7,7 @@ use App\Http\Resources\TicketCommentResource;
 use App\Models\Ticket;
 use App\Models\TicketComment;
 use App\Models\User;
+use App\Notifications\TicketCommented;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -46,7 +47,23 @@ class TicketCommentController extends Controller
 
         $comment->load('author:'.User::DISPLAY_COLUMNS);
 
+        $this->notifyRequester($ticket, $comment);
+
         return response()->json(['comment' => TicketCommentResource::make($comment)->resolve($request)], 201);
+    }
+
+    /**
+     * Tell the person who raised the ticket about the message, unless they wrote it themselves.
+     *
+     * A failure to notify them is reported without stopping the message from being posted.
+     */
+    private function notifyRequester(Ticket $ticket, TicketComment $comment): void
+    {
+        if ($ticket->requester->is($comment->author)) {
+            return;
+        }
+
+        rescue(fn () => $ticket->requester->notify(new TicketCommented($ticket, $comment)));
     }
 
     /**
