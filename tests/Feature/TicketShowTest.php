@@ -77,12 +77,18 @@ test('an admin can open any ticket and may manage it', function () {
             ->where('can.delete', true));
 });
 
-test('a user cannot open a ticket raised by someone else', function () {
+test('a member can open a ticket raised by someone else but may only comment on it', function () {
     $ticket = Ticket::factory()->create();
 
     $this->actingAs(User::factory()->create())
         ->get(route('tickets.show', $ticket))
-        ->assertForbidden();
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Tickets/Show')
+            ->where('can.update', false)
+            ->where('can.delete', false)
+            ->where('can.changeStatus', false)
+            ->where('can.comment', true));
 });
 
 test('a closed ticket tells its requester they cannot comment', function () {

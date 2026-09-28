@@ -43,12 +43,13 @@ test('an image attached to a ticket can be opened by :viewer', function (string 
         ->assertHeader('Content-Disposition', 'inline; filename=error.png');
 })->with(['the requester', 'an admin']);
 
-test('a user cannot open an image attached to somebody else\'s ticket', function () {
+test('a member can open an image attached to somebody else\'s ticket', function () {
     $attachment = attachImage(Ticket::factory()->create());
 
     $this->actingAs(User::factory()->create())
         ->get(route('tickets.attachments.show', [$attachment->ticket_id, $attachment]))
-        ->assertForbidden();
+        ->assertOk()
+        ->assertHeader('Content-Type', 'image/png');
 });
 
 test('an attachment is only found under its own ticket', function () {

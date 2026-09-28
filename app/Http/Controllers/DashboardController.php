@@ -25,12 +25,10 @@ class DashboardController extends Controller
      */
     public function __invoke(Request $request): Response
     {
-        $user = $request->user();
-
         return Inertia::render('Dashboard', [
-            'statusCounts' => $this->countsBy(Ticket::visibleTo($user), 'status', TicketStatus::cases()),
-            'priorityCounts' => $this->countsBy(Ticket::visibleTo($user)->active(), 'priority', array_reverse(TicketPriority::cases())),
-            'typeCounts' => $this->countsBy(Ticket::visibleTo($user)->active(), 'type', TicketType::cases()),
+            'statusCounts' => $this->countsBy(Ticket::query(), 'status', TicketStatus::cases()),
+            'priorityCounts' => $this->countsBy(Ticket::query()->active(), 'priority', array_reverse(TicketPriority::cases())),
+            'typeCounts' => $this->countsBy(Ticket::query()->active(), 'type', TicketType::cases()),
             'recentTickets' => $this->recentTickets($request),
             'recentThreads' => $this->recentThreads($request),
             'latestNews' => $this->latestNews($request),
@@ -76,13 +74,13 @@ class DashboardController extends Controller
     }
 
     /**
-     * Get the latest tickets the user is allowed to see.
+     * Get the latest tickets raised by anyone.
      *
      * @return list<array{id: int, subject: string, requester: string, category: string|null, type: string, status: string, priority: string, created_at: string}>
      */
     private function recentTickets(Request $request): array
     {
-        return Ticket::visibleTo($request->user())
+        return Ticket::query()
             ->with(['requester:'.User::DISPLAY_COLUMNS, 'category:id,name'])
             ->latest()
             ->latest('id')

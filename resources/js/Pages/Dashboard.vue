@@ -48,7 +48,7 @@ const panelLinkClasses = 'text-sm font-medium text-gray-900 underline decoration
             <div class="flex flex-col gap-1">
                 <h1 class="text-2xl font-semibold tracking-tight">Welcome back, {{ firstName }}</h1>
                 <p class="text-sm text-gray-600 dark:text-gray-400">
-                    {{ user.is_admin ? 'Here is what is happening across the help desk.' : 'Here is where your tickets stand.' }}
+                    Here is what is happening across the help desk.
                 </p>
             </div>
             <Link
@@ -95,7 +95,7 @@ const panelLinkClasses = 'text-sm font-medium text-gray-900 underline decoration
                                     <div class="flex flex-col gap-0.5">
                                         <Link :href="`/tickets/${ticket.id}`" class="truncate font-medium underline-offset-4 hover:underline">{{ ticket.subject }}</Link>
                                         <span class="truncate text-xs text-gray-500 dark:text-gray-400">
-                                            {{ ticket.key }}<template v-if="user.is_admin"> &middot; {{ ticket.requester }}</template> &middot; {{ ticket.created_at }}
+                                            {{ ticket.key }} &middot; {{ ticket.requester }} &middot; {{ ticket.created_at }}
                                         </span>
                                     </div>
                                 </td>

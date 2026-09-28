@@ -18,9 +18,10 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 /**
- * An LRMIS account. The users table belongs to LRMIS, so the ticketing system
- * only reads it. Accounts of the LRMIS Administrator type administer the
- * helpdesk and every other account is a member.
+ * An LRMIS account. The users table belongs to LRMIS; the ticketing system only
+ * changes an account's password, or its user type through the grant-admin
+ * command. Accounts of the LRMIS Administrator type administer the helpdesk
+ * and every other account is a member.
  */
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable

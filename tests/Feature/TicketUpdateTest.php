@@ -132,15 +132,18 @@ test('a requester cannot edit their ticket once it is resolved', function (strin
     'submission' => ['put', 'tickets.update'],
 ]);
 
-test('a user cannot update a ticket raised by someone else', function () {
+test('a user cannot edit a ticket raised by someone else', function (string $method, string $routeName) {
     $ticket = Ticket::factory()->create(['subject' => 'Original']);
 
     $this->actingAs(User::factory()->create())
-        ->put(route('tickets.update', $ticket), ['type' => 'bug_report', 'priority' => 'low', 'subject' => 'Hijacked', 'description' => 'Hijacked'])
+        ->{$method}(route($routeName, $ticket), ['type' => 'bug_report', 'priority' => 'low', 'subject' => 'Hijacked', 'description' => 'Hijacked'])
         ->assertForbidden();
 
     expect($ticket->fresh()->subject)->toBe('Original');
-});
+})->with([
+    'form' => ['get', 'tickets.edit'],
+    'submission' => ['put', 'tickets.update'],
+]);
 
 test('an admin can delete a ticket and its comments go with it', function () {
     $ticket = Ticket::factory()->featureRequest()->create();

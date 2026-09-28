@@ -41,16 +41,17 @@ test('a status that does not exist is rejected', function () {
     expect($ticket->fresh()->status)->toBe(TicketStatus::Open);
 });
 
-test('a requester cannot change the status of their own ticket', function () {
+test(':who cannot change the status of a ticket', function (string $who) {
     $requester = User::factory()->create();
     $ticket = Ticket::factory()->for($requester, 'requester')->create();
+    $actor = $who === 'its requester' ? $requester : User::factory()->create();
 
-    $this->actingAs($requester)
+    $this->actingAs($actor)
         ->patch(route('tickets.status.update', $ticket), ['status' => 'closed'])
         ->assertForbidden();
 
     expect($ticket->fresh()->status)->toBe(TicketStatus::Open);
-});
+})->with(['its requester', 'another member']);
 
 test('tickets cannot be assigned to anyone', function () {
     $ticket = Ticket::factory()->create();

@@ -159,18 +159,6 @@ class Ticket extends Model
     }
 
     /**
-     * Scope the query to the tickets the user is allowed to see.
-     *
-     * @param  Builder<Ticket>  $query
-     * @return Builder<Ticket>
-     */
-    #[Scope]
-    protected function visibleTo(Builder $query, User $user): Builder
-    {
-        return $user->isAdmin() ? $query : $query->whereBelongsTo($user, 'requester');
-    }
-
-    /**
      * Scope the query to list the most urgent tickets first.
      *
      * @param  Builder<Ticket>  $query

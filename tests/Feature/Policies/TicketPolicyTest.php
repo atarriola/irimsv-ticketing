@@ -32,7 +32,14 @@ test('a user cannot :ability a ticket raised by someone else', function (string 
     $ticket = Ticket::factory()->create();
 
     expect($otherUser->can($ability, $ticket))->toBeFalse();
-})->with(['view', 'update', 'delete', 'changeStatus', 'comment']);
+})->with(['update', 'delete', 'changeStatus']);
+
+test('a user can :ability a ticket raised by someone else', function (string $ability) {
+    $otherUser = User::factory()->create();
+    $ticket = Ticket::factory()->create();
+
+    expect($otherUser->can($ability, $ticket))->toBeTrue();
+})->with(['view', 'comment']);
 
 test('any user can list and raise tickets', function (string $ability) {
     $user = User::factory()->create();

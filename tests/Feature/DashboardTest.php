@@ -26,7 +26,7 @@ test('a guest is sent to the login page when opening the dashboard', function ()
     $this->get(route('dashboard'))->assertRedirect(route('login'));
 });
 
-test('a user sees status counts for their own tickets only', function () {
+test('a member sees status counts across every ticket', function () {
     $user = User::factory()->create();
     Ticket::factory(2)->for($user, 'requester')->create();
     Ticket::factory()->for($user, 'requester')->resolved()->create();
@@ -37,7 +37,7 @@ test('a user sees status counts for their own tickets only', function () {
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->component('Dashboard')
-            ->where('statusCounts', fn ($counts) => dashboardCount($counts->all(), 'open') === 2
+            ->where('statusCounts', fn ($counts) => dashboardCount($counts->all(), 'open') === 5
                 && dashboardCount($counts->all(), 'in_progress') === 0
                 && dashboardCount($counts->all(), 'resolved') === 1
                 && dashboardCount($counts->all(), 'closed') === 0));
@@ -55,16 +55,16 @@ test('an admin sees status counts across every ticket', function () {
                 && dashboardCount($counts->all(), 'closed') === 2));
 });
 
-test('a user never receives tickets raised by someone else', function () {
+test('a member receives the latest tickets from every user', function () {
     $user = User::factory()->create();
-    $ownTicket = Ticket::factory()->for($user, 'requester')->create();
-    Ticket::factory(2)->create();
+    Ticket::factory()->for($user, 'requester')->create();
+    $latest = Ticket::factory(2)->create()->last();
 
     $this->actingAs($user)
         ->get(route('dashboard'))
         ->assertInertia(fn (Assert $page) => $page
-            ->has('recentTickets', 1)
-            ->where('recentTickets.0.id', $ownTicket->id));
+            ->has('recentTickets', 3)
+            ->where('recentTickets.0.id', $latest->id));
 });
 
 test('urgency and type breakdowns count active tickets only', function () {

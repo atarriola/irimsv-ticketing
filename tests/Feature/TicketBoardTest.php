@@ -55,9 +55,9 @@ test('a board column lists its most urgent tickets first', function () {
             ->where('columns.0.tickets.2.id', $low->id));
 });
 
-test('the board only holds the tickets of the chosen group that the user may see', function () {
+test('the board only holds the tickets of the chosen group, whoever raised them', function () {
     $user = User::factory()->create();
-    $ownFeature = Ticket::factory()->for($user, 'requester')->featureRequest()->create();
+    Ticket::factory()->for($user, 'requester')->featureRequest()->create();
     Ticket::factory()->for($user, 'requester')->create(['type' => TicketType::BugReport]);
     Ticket::factory()->featureRequest()->create();
 
@@ -65,9 +65,8 @@ test('the board only holds the tickets of the chosen group that the user may see
         ->get(route('tickets.index', ['group' => 'feature_requests']))
         ->assertInertia(fn (Assert $page) => $page
             ->where('group', 'feature_requests')
-            ->where('columns.0.total', 1)
-            ->has('columns.0.tickets', 1)
-            ->where('columns.0.tickets.0.id', $ownFeature->id));
+            ->where('columns.0.total', 2)
+            ->has('columns.0.tickets', 2));
 });
 
 test('only an admin is allowed to move cards', function () {
@@ -116,12 +115,14 @@ test('a search term is treated as text, not as a pattern', function () {
         ->assertInertia(fn (Assert $page) => $page->has('tickets.data', 0));
 });
 
-test('searching never reveals tickets raised by someone else', function () {
-    Ticket::factory()->create(['type' => TicketType::BugReport, 'subject' => 'Secret payroll issue']);
+test('searching finds tickets raised by someone else', function () {
+    $ticket = Ticket::factory()->create(['type' => TicketType::BugReport, 'subject' => 'Payroll page is slow']);
 
     $this->actingAs(User::factory()->create())
         ->get(route('tickets.index', ['view' => 'list', 'q' => 'payroll']))
-        ->assertInertia(fn (Assert $page) => $page->has('tickets.data', 0));
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('tickets.data', 1)
+            ->where('tickets.data.0.id', $ticket->id));
 });
 
 test('tickets can be filtered by priority', function () {

@@ -18,10 +18,12 @@ class TicketPolicy
 
     /**
      * Determine whether the user can view the ticket.
+     *
+     * Every member may read any ticket; only editing is limited to its requester and admins.
      */
     public function view(User $user, Ticket $ticket): bool
     {
-        return $user->isAdmin() || $this->isRequester($user, $ticket);
+        return true;
     }
 
     /**

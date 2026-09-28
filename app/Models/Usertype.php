@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use Database\Factories\UsertypeFactory;
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -48,6 +50,18 @@ class Usertype extends Model
     public function isAdministrator(): bool
     {
         return $this->level === self::ADMINISTRATOR_LEVEL;
+    }
+
+    /**
+     * Scope the query to the LRMIS Administrator type.
+     *
+     * @param  Builder<Usertype>  $query
+     * @return Builder<Usertype>
+     */
+    #[Scope]
+    protected function administrator(Builder $query): Builder
+    {
+        return $query->where('level', self::ADMINISTRATOR_LEVEL);
     }
 
     /**

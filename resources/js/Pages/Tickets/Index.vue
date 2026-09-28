@@ -1,5 +1,5 @@
 <script setup>
-import { Head, Link, router, usePage } from '@inertiajs/vue3';
+import { Head, Link, router } from '@inertiajs/vue3';
 import { computed, reactive, ref } from 'vue';
 import AppIcon from '@/Components/AppIcon.vue';
 import Pagination from '@/Components/Pagination.vue';
@@ -22,9 +22,6 @@ const props = defineProps({
     tickets: Object,
     can: Object,
 });
-
-const page = usePage();
-const user = computed(() => page.props.auth.user);
 
 // The heading matches the sidebar entry that leads to each group.
 const headings = { all: 'All tickets', issues: 'Tickets', feature_requests: 'Feature requests' };
@@ -135,7 +132,7 @@ const idleSegmentClasses = 'bg-white text-gray-600 hover:bg-gray-50 hover:text-g
             <div class="flex flex-col gap-1">
                 <h1 class="text-2xl font-semibold tracking-tight">{{ headings[group] }}</h1>
                 <p class="text-sm text-gray-600 dark:text-gray-400">
-                    {{ user.is_admin ? 'Every ticket raised across the system.' : 'The tickets you have raised.' }}
+                    Every ticket raised across the system.
                 </p>
             </div>
 
@@ -219,7 +216,7 @@ const idleSegmentClasses = 'bg-white text-gray-600 hover:bg-gray-50 hover:text-g
                         @dragstart="startDrag($event, ticket)"
                         @dragend="endDrag"
                     >
-                        <TicketCard :ticket="ticket" :show-requester="user.is_admin" draggable="false" />
+                        <TicketCard :ticket="ticket" show-requester draggable="false" />
                     </div>
 
                     <p v-if="column.tickets.length === 0" class="flex flex-col items-center gap-2 rounded-lg border border-dashed border-gray-300 px-2 py-8 text-center text-xs text-gray-500 dark:border-gray-700 dark:text-gray-500">
@@ -258,7 +255,7 @@ const idleSegmentClasses = 'bg-white text-gray-600 hover:bg-gray-50 hover:text-g
                             <th scope="col" class="px-2 py-2.5 font-semibold">Summary</th>
                             <th scope="col" class="px-2 py-2.5 font-semibold">Status</th>
                             <th scope="col" class="px-2 py-2.5 font-semibold">Priority</th>
-                            <th v-if="user.is_admin" scope="col" class="px-2 py-2.5 font-semibold">Reporter</th>
+                            <th scope="col" class="px-2 py-2.5 font-semibold">Reporter</th>
                             <th scope="col" class="py-2.5 pr-4 pl-2 font-semibold">Created</th>
                         </tr>
                     </thead>
@@ -275,7 +272,7 @@ const idleSegmentClasses = 'bg-white text-gray-600 hover:bg-gray-50 hover:text-g
                             <td class="px-2 py-2.5">
                                 <span class="flex items-center gap-1.5 whitespace-nowrap capitalize"><PriorityIcon :priority="ticket.priority" aria-hidden="true" /> {{ ticket.priority }}</span>
                             </td>
-                            <td v-if="user.is_admin" class="px-2 py-2.5 whitespace-nowrap text-gray-600 dark:text-gray-400">
+                            <td class="px-2 py-2.5 whitespace-nowrap text-gray-600 dark:text-gray-400">
                                 <span class="block">{{ ticket.requester }}</span>
                                 <span class="block text-xs text-gray-500 dark:text-gray-500">{{ ticket.requester_position }}</span>
                             </td>

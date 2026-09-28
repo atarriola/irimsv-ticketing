@@ -46,7 +46,7 @@ class TicketController extends Controller
         $search = Str::limit(trim((string) $request->string('q')), 100, '');
         $view = $request->query('view') === 'list' ? 'list' : 'board';
 
-        $tickets = Ticket::visibleTo($user)
+        $tickets = Ticket::query()
             ->whereIn('type', $group->types())
             ->when($priority, fn (Builder $query) => $query->where('priority', $priority))
             ->when($search !== '', fn (Builder $query) => $query->search($search))
@@ -56,7 +56,7 @@ class TicketController extends Controller
         return Inertia::render('Tickets/Index', [
             'view' => $view,
             'group' => $group->value,
-            'groups' => $this->groupCounts($user),
+            'groups' => $this->groupCounts(),
             'filters' => [
                 'q' => $search,
                 'status' => $status?->value,
@@ -286,13 +286,13 @@ class TicketController extends Controller
     }
 
     /**
-     * Count the tickets the user can see in each group.
+     * Count the tickets in each group.
      *
      * @return list<array{key: string, label: string, count: int}>
      */
-    private function groupCounts(User $user): array
+    private function groupCounts(): array
     {
-        $totals = Ticket::visibleTo($user)
+        $totals = Ticket::query()
             ->toBase()
             ->select('type')
             ->selectRaw('count(*) as total')

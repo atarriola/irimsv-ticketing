@@ -49,14 +49,19 @@ test('a message cannot be empty', function () {
     expect(TicketComment::count())->toBe(0);
 });
 
-test('a user cannot join the conversation on a ticket raised by someone else', function () {
+test('a member can join the conversation on a ticket raised by someone else', function () {
     $ticket = Ticket::factory()->create();
+    $member = User::factory()->create();
 
-    $this->actingAs(User::factory()->create())
-        ->postJson(route('tickets.comments.store', $ticket), ['body' => 'Let me in'])
-        ->assertForbidden();
+    $this->actingAs($member)
+        ->postJson(route('tickets.comments.store', $ticket), ['body' => 'Happens to me too'])
+        ->assertCreated()
+        ->assertJsonPath('comment.body', 'Happens to me too')
+        ->assertJsonPath('comment.author', $member->name)
+        ->assertJsonPath('comment.author_is_admin', false)
+        ->assertJsonPath('comment.is_mine', true);
 
-    expect(TicketComment::count())->toBe(0);
+    expect(TicketComment::sole()->user_id)->toBe($member->id);
 });
 
 test('nobody can send a message on a closed ticket', function () {
@@ -111,13 +116,18 @@ test('an open page learns that the ticket was closed and messages are no longer 
         ->assertJsonPath('can_comment', false);
 });
 
-test('a user cannot read the conversation on a ticket raised by someone else', function () {
+test('a member can read the conversation on a ticket raised by someone else', function () {
     $ticket = Ticket::factory()->create();
-    TicketComment::factory()->for($ticket)->create();
+    $comment = TicketComment::factory()->for($ticket)->create();
 
     $this->actingAs(User::factory()->create())
         ->getJson(route('tickets.comments.index', $ticket))
-        ->assertForbidden();
+        ->assertOk()
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.id', $comment->id)
+        ->assertJsonPath('data.0.is_mine', false)
+        ->assertJsonPath('data.0.can.delete', false)
+        ->assertJsonPath('can_comment', true);
 });
 
 test(':role can delete a message', function (string $role) {

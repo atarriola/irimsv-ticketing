@@ -43,7 +43,6 @@ test('every type of ticket is listed together in the all group', function () {
     $user = User::factory()->create();
     $bug = Ticket::factory()->for($user, 'requester')->create(['type' => TicketType::BugReport]);
     $featureRequest = Ticket::factory()->for($user, 'requester')->featureRequest()->create();
-    Ticket::factory()->featureRequest()->create();
 
     $this->actingAs($user)
         ->get(route('tickets.index', ['view' => 'list', 'group' => 'all']))
@@ -75,7 +74,7 @@ test('an unknown group falls back to bugs and problems', function () {
         ->assertInertia(fn (Assert $page) => $page->where('group', 'issues'));
 });
 
-test('a user only sees and counts their own tickets', function () {
+test('a member sees and counts tickets from every user', function () {
     $user = User::factory()->create();
     $ownTicket = Ticket::factory()->for($user, 'requester')->create(['type' => TicketType::Problem]);
     Ticket::factory(2)->create(['type' => TicketType::BugReport]);
@@ -84,14 +83,14 @@ test('a user only sees and counts their own tickets', function () {
     $this->actingAs($user)
         ->get(route('tickets.index', ['view' => 'list']))
         ->assertInertia(fn (Assert $page) => $page
-            ->has('tickets.data', 1)
-            ->where('tickets.data.0.id', $ownTicket->id)
+            ->has('tickets.data', 3)
+            ->where('tickets.data.2.id', $ownTicket->id)
             ->where('groups.0.key', 'all')
-            ->where('groups.0.count', 1)
+            ->where('groups.0.count', 4)
             ->where('groups.1.key', 'issues')
-            ->where('groups.1.count', 1)
+            ->where('groups.1.count', 3)
             ->where('groups.2.key', 'feature_requests')
-            ->where('groups.2.count', 0));
+            ->where('groups.2.count', 1));
 });
 
 test('an admin sees and counts tickets from every user', function () {
