@@ -21,18 +21,20 @@ trait HasReactions
 
     /**
      * Toggle the user's reaction of the given type.
+     *
+     * Returns the reaction now on record, or null when the user has just taken theirs back.
      */
-    public function toggleReaction(User $user, ReactionType $type): void
+    public function toggleReaction(User $user, ReactionType $type): ?ForumReaction
     {
         $existing = $this->reactions()->whereBelongsTo($user)->first();
 
         if ($existing?->type === $type) {
             $existing->delete();
 
-            return;
+            return null;
         }
 
-        $this->reactions()->updateOrCreate(['user_id' => $user->id], ['type' => $type]);
+        return $this->reactions()->updateOrCreate(['user_id' => $user->id], ['type' => $type]);
     }
 
     /**

@@ -1,11 +1,15 @@
 <?php
 
+use App\Enums\ReactionType;
+use App\Models\ForumReaction;
 use App\Models\ForumReply;
 use App\Models\ForumThread;
 use App\Models\ForumTopic;
 use App\Models\User;
+use App\Notifications\ForumCommentReacted;
 use App\Notifications\ForumCommentReplied;
 use App\Notifications\ForumThreadCommented;
+use App\Notifications\ForumThreadReacted;
 use App\Notifications\ForumThreadStarted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
@@ -219,4 +223,91 @@ test('a guest cannot read notifications', function () {
 
 test('a guest is sent to the login page when opening the notifications page', function () {
     $this->get(route('notifications.index'))->assertRedirect(route('login'));
+});
+
+test('a reaction notifies the thread author but not the person who reacted', function () {
+    Notification::fake();
+    $author = User::factory()->create();
+    $thread = ForumThread::factory()->for($author, 'author')->create();
+    $reactor = User::factory()->create();
+
+    $this->actingAs($reactor)
+        ->postJson(route('forum.threads.reactions.store', $thread), ['type' => 'heart'])
+        ->assertOk();
+
+    Notification::assertSentTo($author, ForumThreadReacted::class, fn (ForumThreadReacted $notification): bool => $notification->thread->is($thread) && $notification->reaction->type === ReactionType::Heart && $notification->reaction->user->is($reactor));
+    Notification::assertNotSentTo($reactor, ForumThreadReacted::class);
+});
+
+test('a reaction on a comment notifies the comment author and not the thread author', function () {
+    Notification::fake();
+    $author = User::factory()->create();
+    $thread = ForumThread::factory()->for($author, 'author')->create();
+    $commenter = User::factory()->create();
+    $comment = ForumReply::factory()->for($thread, 'thread')->for($commenter, 'author')->create();
+
+    $this->actingAs(User::factory()->create())
+        ->postJson(route('forum.replies.reactions.store', $comment), ['type' => 'like'])
+        ->assertOk();
+
+    Notification::assertSentTo($commenter, ForumCommentReacted::class, fn (ForumCommentReacted $notification): bool => $notification->reply->is($comment) && $notification->thread->is($thread) && $notification->reaction->type === ReactionType::Like);
+    Notification::assertNotSentTo($author, ForumCommentReacted::class);
+    Notification::assertCount(1);
+});
+
+test('reacting to your own thread notifies nobody', function () {
+    Notification::fake();
+    $author = User::factory()->create();
+    $thread = ForumThread::factory()->for($author, 'author')->create();
+
+    $this->actingAs($author)
+        ->postJson(route('forum.threads.reactions.store', $thread), ['type' => 'heart'])
+        ->assertOk();
+
+    Notification::assertNothingSent();
+});
+
+test('reacting to your own comment notifies nobody', function () {
+    Notification::fake();
+    $author = User::factory()->create();
+    $comment = ForumReply::factory()->for($author, 'author')->create();
+
+    $this->actingAs($author)
+        ->postJson(route('forum.replies.reactions.store', $comment), ['type' => 'heart'])
+        ->assertOk();
+
+    Notification::assertNothingSent();
+});
+
+test('changing or taking back a reaction sends no further notification', function (string $type) {
+    Notification::fake();
+    $author = User::factory()->create();
+    $thread = ForumThread::factory()->for($author, 'author')->create();
+    $reactor = User::factory()->create();
+    ForumReaction::factory()->for($thread, 'thread')->for($reactor)->create(['type' => ReactionType::Heart]);
+
+    $this->actingAs($reactor)
+        ->postJson(route('forum.threads.reactions.store', $thread), ['type' => $type])
+        ->assertOk();
+
+    Notification::assertNothingSent();
+})->with([
+    'changing it to another reaction' => 'laugh',
+    'taking it back' => 'heart',
+]);
+
+test('a stored reaction notification carries what the bell shows', function () {
+    $author = User::factory()->create(['firstname' => 'Ana', 'lastname' => 'Reyes']);
+    $thread = ForumThread::factory()->for($author, 'author')->create(['body' => 'Portal is slow']);
+    $reactor = User::factory()->create(['firstname' => 'Maria', 'lastname' => 'Santos']);
+    $this->actingAs($reactor)->postJson(route('forum.threads.reactions.store', $thread), ['type' => 'heart'])->assertOk();
+
+    $this->actingAs($author)
+        ->getJson(route('notifications.index'))
+        ->assertOk()
+        ->assertJsonPath('unread_count', 1)
+        ->assertJsonPath('data.0.kind', 'reaction')
+        ->assertJsonPath('data.0.message', 'Maria Santos reacted ❤️ to your thread')
+        ->assertJsonPath('data.0.excerpt', 'Portal is slow')
+        ->assertJsonPath('data.0.url', route('forum.threads.show', $thread));
 });

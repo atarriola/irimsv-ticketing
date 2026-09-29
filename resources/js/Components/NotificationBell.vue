@@ -192,7 +192,7 @@ onBeforeUnmount(() => {
             <p v-if="loader.processing && !hasLoaded" class="px-3 py-6 text-center text-sm text-gray-500 dark:text-gray-400">Loading…</p>
 
             <p v-else-if="notifications.length === 0" class="px-3 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
-                {{ filter === 'unread' ? 'No unread notifications.' : 'Nothing yet. You will hear here when someone comments on your tickets or threads, or replies to your comments.' }}
+                {{ filter === 'unread' ? 'No unread notifications.' : 'Nothing yet. You will hear here when someone comments on your tickets or threads, replies to your comments, or reacts to your posts.' }}
             </p>
 
             <ul v-else class="max-h-96 overflow-y-auto py-1">

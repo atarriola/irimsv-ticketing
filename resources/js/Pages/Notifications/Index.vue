@@ -84,7 +84,7 @@ function goBack() {
         </nav>
 
         <p v-if="notifications.data.length === 0" class="rounded-lg border border-dashed border-gray-300 bg-white px-6 py-16 text-center text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400">
-            {{ filter === 'unread' ? 'No unread notifications.' : 'Nothing yet. You will hear about comments on your threads and replies to your comments here.' }}
+            {{ filter === 'unread' ? 'No unread notifications.' : 'Nothing yet. You will hear about comments on your threads, replies to your comments, and reactions to your posts here.' }}
         </p>
 
         <InfiniteScroll v-else data="notifications" :manual-after="3" class="divide-y divide-gray-100 rounded-lg border border-gray-200 bg-white dark:divide-gray-800 dark:border-gray-800 dark:bg-gray-900">
