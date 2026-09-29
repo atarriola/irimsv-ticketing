@@ -42,6 +42,7 @@ class UserController extends Controller
                 'is_admin' => $user->isAdmin(),
                 'tickets_count' => $user->tickets_count,
                 'created_at' => $user->created_at?->toFormattedDateString(),
+                'can_reset_password' => $request->user()->can('resetPassword', $user),
             ]);
 
         return Inertia::render('Admin/Users/Index', [

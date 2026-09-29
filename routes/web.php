@@ -1,9 +1,11 @@
 <?php
 
 use App\Http\Controllers\AccountController;
+use App\Http\Controllers\AccountPasswordController;
 use App\Http\Controllers\Admin\CategoryController as AdminCategoryController;
 use App\Http\Controllers\Admin\ForumTopicController as AdminForumTopicController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
+use App\Http\Controllers\Admin\UserPasswordController as AdminUserPasswordController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ForumReplyController;
@@ -44,7 +46,10 @@ Route::middleware('auth')->group(function () {
     Route::get('/news/{post}/attachments/{attachment}', [NewsAttachmentController::class, 'show'])->whereNumber(['post', 'attachment'])->scopeBindings()->name('news.attachments.show');
     Route::delete('/news/{post}/attachments/{attachment}', [NewsAttachmentController::class, 'destroy'])->whereNumber(['post', 'attachment'])->scopeBindings()->name('news.attachments.destroy');
 
-    Route::get('/account', AccountController::class)->name('account.show');
+    Route::get('/account', [AccountController::class, 'show'])->name('account.show');
+    Route::get('/account/edit', [AccountController::class, 'edit'])->name('account.edit');
+    Route::patch('/account', [AccountController::class, 'update'])->name('account.update');
+    Route::put('/account/password', [AccountPasswordController::class, 'update'])->name('account.password.update');
 
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
     Route::post('/notifications/read', [NotificationReadController::class, 'store'])->name('notifications.read.store');
@@ -52,6 +57,8 @@ Route::middleware('auth')->group(function () {
 
     Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('/users', [AdminUserController::class, 'index'])->name('users.index');
+        Route::get('/users/{user}/password/edit', [AdminUserPasswordController::class, 'edit'])->whereUuid('user')->name('users.password.edit');
+        Route::put('/users/{user}/password', [AdminUserPasswordController::class, 'update'])->whereUuid('user')->name('users.password.update');
         Route::resource('categories', AdminCategoryController::class)->except('show')->whereNumber('category');
         Route::resource('forum-topics', AdminForumTopicController::class)->except('show')->parameters(['forum-topics' => 'topic']);
     });

@@ -1,5 +1,5 @@
 <script setup>
-import { Form, Head } from '@inertiajs/vue3';
+import { Form, Head, Link } from '@inertiajs/vue3';
 import FormField from '@/Components/FormField.vue';
 import SubmitButton from '@/Components/SubmitButton.vue';
 import AppLayout from '@/Layouts/AppLayout.vue';
@@ -13,11 +13,12 @@ defineProps({
 
 <template>
     <div class="mx-auto flex w-full max-w-2xl flex-col gap-6">
-        <Head title="My account" />
+        <Head title="Edit account" />
 
         <header class="flex flex-col gap-1">
-            <h1 class="text-2xl font-semibold tracking-tight">My account</h1>
-            <p class="text-sm text-gray-600 dark:text-gray-400">Update your details and change your password.</p>
+            <Link href="/account" class="w-fit text-sm font-medium text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100">&larr; Back to my account</Link>
+            <h1 class="text-2xl font-semibold tracking-tight">Edit account</h1>
+            <p class="text-sm text-gray-600 dark:text-gray-400">The helpdesk and LRMIS share the same accounts, so these changes apply in LRMIS as well.</p>
         </header>
 
         <Form
@@ -26,11 +27,26 @@ defineProps({
             class="flex flex-col gap-5 rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-900"
             #default="{ errors, processing }"
         >
-            <h2 class="text-sm font-semibold">Your details</h2>
+            <div class="flex flex-col gap-1">
+                <h2 class="text-sm font-semibold">Your details</h2>
+                <p class="text-sm text-gray-600 dark:text-gray-400">
+                    You sign in as <span class="font-medium text-gray-900 dark:text-gray-100">{{ account.username }}</span>, which cannot be changed here.
+                </p>
+            </div>
 
-            <FormField id="name" name="name" label="Full name" autocomplete="name" :initial-value="account.name" :error="errors.name" required />
+            <div class="grid gap-5 sm:grid-cols-2">
+                <FormField id="firstname" name="firstname" label="First name" autocomplete="given-name" :initial-value="account.firstname" :error="errors.firstname" required />
 
-            <FormField id="email" name="email" type="email" label="Email address" autocomplete="username" :initial-value="account.email" :error="errors.email" required />
+                <FormField id="middlename" name="middlename" label="Middle name" autocomplete="additional-name" :initial-value="account.middlename ?? ''" :error="errors.middlename" />
+
+                <FormField id="lastname" name="lastname" label="Last name" autocomplete="family-name" :initial-value="account.lastname" :error="errors.lastname" required />
+
+                <FormField id="extension_name" name="extension_name" label="Extension name" placeholder="Jr., Sr., III" :initial-value="account.extension_name ?? ''" :error="errors.extension_name" />
+            </div>
+
+            <FormField id="email" name="email" type="email" label="Email address" autocomplete="email" :initial-value="account.email" :error="errors.email" required />
+
+            <FormField id="contact_number" name="contact_number" type="tel" label="Contact number" autocomplete="tel" :initial-value="account.contact_number ?? ''" :error="errors.contact_number" />
 
             <div class="flex justify-end">
                 <SubmitButton :processing="processing">{{ processing ? 'Saving…' : 'Save details' }}</SubmitButton>

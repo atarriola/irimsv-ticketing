@@ -1,6 +1,7 @@
 <script setup>
-import { Head, router } from '@inertiajs/vue3';
+import { Head, Link, router } from '@inertiajs/vue3';
 import { ref } from 'vue';
+import AppIcon from '@/Components/AppIcon.vue';
 import Pagination from '@/Components/Pagination.vue';
 import AppLayout from '@/Layouts/AppLayout.vue';
 
@@ -56,11 +57,12 @@ function submitSearch() {
                         <th scope="col" class="px-5 py-3 font-medium">Role</th>
                         <th scope="col" class="px-5 py-3 font-medium">Tickets</th>
                         <th scope="col" class="px-5 py-3 font-medium">Joined</th>
+                        <th scope="col" class="px-5 py-3 font-medium"><span class="sr-only">Actions</span></th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                     <tr v-if="users.data.length === 0">
-                        <td colspan="6" class="px-5 py-8 text-center text-gray-500 dark:text-gray-400">No LRMIS accounts match your search.</td>
+                        <td colspan="7" class="px-5 py-8 text-center text-gray-500 dark:text-gray-400">No LRMIS accounts match your search.</td>
                     </tr>
                     <tr v-for="user in users.data" :key="user.id" class="hover:bg-gray-50 dark:hover:bg-gray-800/50">
                         <td class="w-full max-w-0 min-w-48 px-5 py-3">
@@ -85,6 +87,26 @@ function submitSearch() {
                         </td>
                         <td class="px-5 py-3 text-gray-600 tabular-nums dark:text-gray-400">{{ user.tickets_count }}</td>
                         <td class="px-5 py-3 whitespace-nowrap text-gray-600 dark:text-gray-400">{{ user.created_at ?? '—' }}</td>
+                        <td class="px-3 py-2 whitespace-nowrap">
+                            <span class="flex justify-end">
+                                <Link
+                                    v-if="user.can_reset_password"
+                                    :href="`/admin/users/${user.id}/password/edit`"
+                                    :title="`Reset the password of ${user.name}`"
+                                    class="flex size-9 items-center justify-center rounded-lg text-gray-500 transition hover:bg-gray-100 hover:text-gray-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100 dark:focus-visible:outline-gray-100"
+                                >
+                                    <AppIcon name="key" :label="`Reset the password of ${user.name}`" />
+                                </Link>
+                                <Link
+                                    v-else
+                                    href="/account/edit"
+                                    title="Edit my account"
+                                    class="flex size-9 items-center justify-center rounded-lg text-gray-500 transition hover:bg-gray-100 hover:text-gray-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100 dark:focus-visible:outline-gray-100"
+                                >
+                                    <AppIcon name="user-circle" label="Edit my account" />
+                                </Link>
+                            </span>
+                        </td>
                     </tr>
                 </tbody>
             </table>

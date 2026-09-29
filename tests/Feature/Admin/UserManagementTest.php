@@ -38,9 +38,11 @@ test('an administrator sees the LRMIS accounts with their position, status, role
             ->where('users.data.0.is_active', false)
             ->where('users.data.0.is_admin', false)
             ->where('users.data.0.tickets_count', 2)
+            ->where('users.data.0.can_reset_password', true)
             ->where('users.data.1.name', 'Zed Young')
             ->where('users.data.1.position', 'Administrator')
             ->where('users.data.1.is_admin', true)
+            ->where('users.data.1.can_reset_password', false)
             ->missing('users.data.0.password'));
 });
 

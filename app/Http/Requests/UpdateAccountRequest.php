@@ -14,7 +14,7 @@ class UpdateAccountRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return $this->user() !== null;
+        return $this->user()?->can('update', $this->user()) ?? false;
     }
 
     /**
@@ -25,8 +25,26 @@ class UpdateAccountRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'string', 'lowercase', 'email', 'max:255', Rule::unique(User::class)->ignore($this->user())],
+            'firstname' => ['required', 'string', 'max:255'],
+            'middlename' => ['nullable', 'string', 'max:255'],
+            'lastname' => ['required', 'string', 'max:255'],
+            'extension_name' => ['nullable', 'string', 'max:255'],
+            'email' => ['required', 'string', 'email', 'max:255', Rule::unique(User::class)->ignore($this->user())],
+            'contact_number' => ['nullable', 'string', 'max:255'],
+        ];
+    }
+
+    /**
+     * Get the validated details, with a missing contact number stored as an
+     * empty string because the LRMIS column cannot be null.
+     *
+     * @return array{firstname: string, middlename: string|null, lastname: string, extension_name: string|null, email: string, contact_number: string}
+     */
+    public function accountAttributes(): array
+    {
+        return [
+            ...$this->safe()->only(['firstname', 'middlename', 'lastname', 'extension_name', 'email']),
+            'contact_number' => $this->validated('contact_number') ?? '',
         ];
     }
 }
