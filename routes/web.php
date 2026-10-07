@@ -7,6 +7,7 @@ use App\Http\Controllers\Admin\ForumTopicController as AdminForumTopicController
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Admin\UserPasswordController as AdminUserPasswordController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
+use App\Http\Controllers\Auth\SingleSignOnController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ForumReplyController;
 use App\Http\Controllers\ForumReplyReactionController;
@@ -29,6 +30,14 @@ Route::middleware('guest')->group(function () {
     Route::get('/login', fn () => redirect()->route('login'));
     Route::post('/login', [AuthenticatedSessionController::class, 'store'])->name('login.store');
 });
+
+// Single sign-on from iRIMS-V's Help Desk link, which POSTs a one-time token
+// (exempt from CSRF in bootstrap/app.php — the signed token is the proof).
+// Outside `guest` on purpose: a different account may already be signed in on
+// this browser, and the link switches to the one iRIMS-V vouches for. A GET
+// carries no token, so it simply goes to the sign-in page.
+Route::post('/sso', SingleSignOnController::class)->middleware('throttle:20,1')->name('sso');
+Route::get('/sso', fn () => redirect()->route('login'));
 
 Route::middleware('auth')->group(function () {
     Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
