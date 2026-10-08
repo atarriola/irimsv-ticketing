@@ -18,6 +18,9 @@ const props = defineProps({
     live: Boolean,
     // The server time the initial comments were rendered at, so the first live check catches every edit made since.
     syncedAt: { type: String, default: null },
+    // The comment marked as the thread's answer, and whether the viewer may change that mark.
+    acceptedReplyId: { type: Number, default: null },
+    canAcceptAnswer: Boolean,
 });
 
 // "thread" carries the thread's own live state (lock, pin, reactions, message); "gone" fires once the thread has been deleted.
@@ -252,6 +255,8 @@ defineExpose({ focusCommentBox: () => commentBox.value?.focus(), sync });
             :thread-id="threadId"
             :can-reply="canReply"
             :reaction-types="reactionTypes"
+            :is-accepted="comment.id === acceptedReplyId"
+            :can-accept-answer="canAcceptAnswer"
             @created="onReplyCreated"
             @deleted="onReplyDeleted"
         />

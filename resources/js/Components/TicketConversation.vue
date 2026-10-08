@@ -1,6 +1,8 @@
 <script setup>
 import { useHttp } from '@inertiajs/vue3';
+import { echoIsConfigured, useEcho } from '@laravel/echo-vue';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
+import AppIcon from '@/Components/AppIcon.vue';
 import CommentBox from '@/Components/CommentBox.vue';
 import UserAvatar from '@/Components/UserAvatar.vue';
 
@@ -8,16 +10,25 @@ const props = defineProps({
     ticketId: { type: Number, required: true },
     initialMessages: { type: Array, required: true },
     canComment: Boolean,
+    canAddInternalNote: Boolean,
+    savedReplies: { type: Array, default: () => [] },
 });
 
-// How often an open ticket asks the server for messages it has not seen yet.
-const REFRESH_EVERY_MS = 8000;
+// "changed" tells the page that something arrived over the socket, so it can refresh the ticket's own details too.
+const emit = defineEmits(['changed']);
+
+// How often an open ticket asks the server for messages it has not seen yet. Over a WebSocket the server
+// announces every change, so the timer only resyncs now and then in case one was missed.
+const hasSocket = echoIsConfigured();
+const REFRESH_EVERY_MS = hasSocket ? 60000 : 8000;
 
 const messages = ref([...props.initialMessages]);
 const canPost = ref(props.canComment);
 const list = ref(null);
 const refresher = useHttp({});
 const remover = useHttp({});
+const editor = useHttp({ body: '' });
+const editingId = ref(null);
 
 const lastId = computed(() => messages.value.reduce((highest, message) => Math.max(highest, message.id), 0));
 
@@ -59,20 +70,67 @@ function addMessages(incoming) {
     }
 }
 
+// A full copy from the server replaces what is shown: edits and deletions by other people are picked up along with new messages.
+function replaceMessages(incoming) {
+    const shouldFollow = isNearBottom();
+    const hadNew = incoming.some((message) => !messages.value.some((known) => known.id === message.id));
+
+    messages.value = incoming;
+
+    if (hadNew && shouldFollow) {
+        scrollToBottom();
+    }
+}
+
 function onSent(response) {
     addMessages([response.comment]);
     scrollToBottom();
 }
 
-function refresh() {
-    if (document.hidden || refresher.processing) {
+function fetchMessages(everything) {
+    if (refresher.processing) {
         return;
     }
 
-    refresher.get(`/tickets/${props.ticketId}/comments?after=${lastId.value}`, {
+    refresher.get(`/tickets/${props.ticketId}/comments${everything ? '' : `?after=${lastId.value}`}`, {
         onSuccess: (response) => {
-            addMessages(response.data);
+            if (everything) {
+                replaceMessages(response.data);
+            } else {
+                addMessages(response.data);
+            }
+
             canPost.value = response.can_comment;
+        },
+    });
+}
+
+function refresh() {
+    if (!document.hidden) {
+        fetchMessages(false);
+    }
+}
+
+function sync() {
+    fetchMessages(true);
+    emit('changed');
+}
+
+function startEditing(message) {
+    editingId.value = message.id;
+    editor.body = message.body;
+    editor.clearErrors();
+}
+
+function saveEdit(message) {
+    if (editor.processing || editor.body.trim() === '') {
+        return;
+    }
+
+    editor.put(`/ticket-comments/${message.id}`, {
+        onSuccess: (response) => {
+            messages.value = messages.value.map((item) => (item.id === response.comment.id ? response.comment : item));
+            editingId.value = null;
         },
     });
 }
@@ -101,6 +159,17 @@ onBeforeUnmount(() => {
     clearInterval(timer);
     document.removeEventListener('visibilitychange', refresh);
 });
+
+if (hasSocket) {
+    // The server announces every change to the ticket; the announcement carries nothing, the sync fetches the details.
+    useEcho(`ticket.${props.ticketId}`, 'TicketConversationChanged', sync);
+}
+
+const bubbleClasses = {
+    mine: 'rounded-br-md bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900',
+    theirs: 'rounded-bl-md bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200',
+    internal: 'rounded-bl-md border border-amber-200 bg-amber-50 text-amber-950 dark:border-amber-400/30 dark:bg-amber-500/10 dark:text-amber-100',
+};
 </script>
 
 <template>
@@ -120,25 +189,56 @@ onBeforeUnmount(() => {
                     {{ message.sent_on }}
                 </p>
 
-                <article class="flex items-end gap-2" :class="message.is_mine ? 'flex-row-reverse' : ''">
+                <article class="flex items-end gap-2" :class="message.is_mine && !message.is_internal ? 'flex-row-reverse' : ''">
                     <UserAvatar :name="message.author" :photo-url="message.author_photo_url" :is-admin="message.author_is_admin" small />
 
-                    <div class="flex max-w-[80%] min-w-0 flex-col gap-1" :class="message.is_mine ? 'items-end' : 'items-start'">
-                        <span class="flex items-center gap-2 px-1 text-xs text-gray-500 dark:text-gray-400">
+                    <div class="flex max-w-[80%] min-w-0 flex-col gap-1" :class="message.is_mine && !message.is_internal ? 'items-end' : 'items-start'">
+                        <span class="flex flex-wrap items-center gap-2 px-1 text-xs text-gray-500 dark:text-gray-400">
                             <span class="font-semibold text-gray-700 dark:text-gray-300">{{ message.is_mine ? 'You' : message.author }}</span>
                             <span>{{ message.author_position }}</span>
                             <span v-if="message.author_is_admin" class="rounded bg-gray-100 px-1.5 py-0.5 font-medium text-gray-700 dark:bg-gray-800 dark:text-gray-300">Support</span>
+                            <span v-if="message.is_internal" class="flex items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 font-medium text-amber-800 dark:bg-amber-500/20 dark:text-amber-300">
+                                <AppIcon name="lock" class="size-3" />
+                                Internal note
+                            </span>
                         </span>
 
+                        <form v-if="editingId === message.id" class="flex w-full flex-col gap-1.5" @submit.prevent="saveEdit(message)">
+                            <label :for="`edit-${message.id}`" class="sr-only">Edit message</label>
+                            <textarea
+                                :id="`edit-${message.id}`"
+                                v-model="editor.body"
+                                rows="3"
+                                class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-gray-900 focus:ring-1 focus:ring-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:focus:border-gray-100 dark:focus:ring-gray-100"
+                                @keydown.esc="editingId = null"
+                            ></textarea>
+                            <p v-if="editor.errors.body" class="text-xs text-red-600 dark:text-red-400">{{ editor.errors.body }}</p>
+                            <span class="flex gap-3 text-xs font-medium">
+                                <button type="submit" :disabled="editor.processing" class="cursor-pointer text-gray-900 hover:underline dark:text-gray-100">Save</button>
+                                <button type="button" class="cursor-pointer text-gray-500 hover:underline dark:text-gray-400" @click="editingId = null">Cancel</button>
+                            </span>
+                        </form>
+
                         <p
+                            v-else
                             class="rounded-2xl px-3.5 py-2 text-sm leading-relaxed break-words whitespace-pre-line"
-                            :class="message.is_mine ? 'rounded-br-md bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900' : 'rounded-bl-md bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'"
+                            :class="message.is_internal ? bubbleClasses.internal : message.is_mine ? bubbleClasses.mine : bubbleClasses.theirs"
                         >
                             {{ message.body }}
                         </p>
 
+                        <ul v-if="message.attachments?.length > 0" class="flex flex-wrap gap-2">
+                            <li v-for="attachment in message.attachments" :key="attachment.id">
+                                <a :href="attachment.url" target="_blank" rel="noopener" :title="attachment.name">
+                                    <img :src="attachment.url" :alt="attachment.name" loading="lazy" class="size-24 rounded-lg border border-gray-200 object-cover transition hover:opacity-90 dark:border-gray-700" />
+                                </a>
+                            </li>
+                        </ul>
+
                         <span class="flex items-center gap-2 px-1 text-xs text-gray-500 dark:text-gray-400">
                             {{ message.sent_at }}
+                            <span v-if="message.is_edited">(edited)</span>
+                            <button v-if="message.can.update && editingId !== message.id" type="button" class="cursor-pointer font-medium hover:underline" @click="startEditing(message)">Edit</button>
                             <button
                                 v-if="message.can.delete"
                                 type="button"
@@ -155,7 +255,16 @@ onBeforeUnmount(() => {
         </div>
 
         <div class="border-t border-gray-200 p-4 dark:border-gray-800">
-            <CommentBox v-if="canPost" :url="`/tickets/${ticketId}/comments`" :box-id="`ticket-${ticketId}`" placeholder="Write a message…" @created="onSent" />
+            <CommentBox
+                v-if="canPost"
+                :url="`/tickets/${ticketId}/comments`"
+                :box-id="`ticket-${ticketId}`"
+                placeholder="Write a message…"
+                allow-attachments
+                :allow-internal="canAddInternalNote"
+                :saved-replies="savedReplies"
+                @created="onSent"
+            />
             <p v-else class="text-center text-sm text-gray-600 dark:text-gray-400">This ticket is closed, so the conversation is read-only.</p>
         </div>
     </section>

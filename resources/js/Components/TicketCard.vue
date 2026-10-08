@@ -3,6 +3,7 @@ import { Link } from '@inertiajs/vue3';
 import AppIcon from '@/Components/AppIcon.vue';
 import PriorityIcon from '@/Components/PriorityIcon.vue';
 import TicketTypeIcon from '@/Components/TicketTypeIcon.vue';
+import WaitingBadge from '@/Components/WaitingBadge.vue';
 
 defineProps({
     ticket: { type: Object, required: true },
@@ -18,7 +19,8 @@ defineProps({
     >
         <span class="line-clamp-3 text-sm break-words text-gray-900 dark:text-gray-100">{{ ticket.subject }}</span>
 
-        <span v-if="ticket.category || showRequester" class="flex flex-wrap gap-1.5">
+        <span v-if="ticket.category || showRequester || ticket.waiting_on" class="flex flex-wrap gap-1.5">
+            <WaitingBadge :waiting-on="ticket.waiting_on" :label="ticket.waiting_label" />
             <span v-if="ticket.category" class="rounded bg-gray-100 px-1.5 py-0.5 text-xs font-medium text-gray-600 dark:bg-gray-700 dark:text-gray-300">{{ ticket.category }}</span>
             <span v-if="showRequester" class="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-600 dark:bg-gray-700 dark:text-gray-300">{{ ticket.requester }}</span>
         </span>
@@ -30,6 +32,10 @@ defineProps({
             </span>
 
             <span class="flex shrink-0 items-center gap-2">
+                <span v-if="ticket.supporters_count > 0" class="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400" :title="`${ticket.supporters_count} ${ticket.type_key === 'feature_request' ? 'votes' : 'people affected'}`">
+                    <AppIcon name="thumb-up" class="size-3.5" />
+                    {{ ticket.supporters_count }}
+                </span>
                 <span v-if="ticket.comments_count > 0" class="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400" :title="`${ticket.comments_count} comments`">
                     <AppIcon name="comment" class="size-3.5" />
                     {{ ticket.comments_count }}

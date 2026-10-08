@@ -83,15 +83,21 @@ function deleteThread() {
                         <span v-if="post.is_locked" :class="tagClasses">Locked</span>
                     </span>
 
-                    <span v-if="can.moderate || can.update || can.delete" class="flex flex-wrap items-center gap-4">
+                    <span v-if="can.moderate || can.update || can.delete || can.raiseTicket" class="flex flex-wrap items-center gap-4">
                         <template v-if="can.moderate">
                             <button type="button" :class="actionClasses" @click="moderate({ is_pinned: !post.is_pinned })">{{ post.is_pinned ? 'Unpin' : 'Pin' }}</button>
                             <button type="button" :class="actionClasses" @click="moderate({ is_locked: !post.is_locked })">{{ post.is_locked ? 'Unlock' : 'Lock' }}</button>
                         </template>
+                        <Link v-if="can.raiseTicket" :href="`/tickets/create?thread=${thread.id}`" :class="actionClasses">Raise as ticket</Link>
                         <Link v-if="can.update" :href="`/forum/threads/${thread.id}/edit`" :class="actionClasses">Edit</Link>
                         <button v-if="can.delete" type="button" :class="dangerClasses" @click="deleteThread">Delete</button>
                     </span>
                 </footer>
+
+                <p v-if="thread.tickets?.length > 0" class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-600 dark:text-gray-400">
+                    Raised as
+                    <Link v-for="ticket in thread.tickets" :key="ticket.id" :href="ticket.url" class="font-medium text-gray-900 underline decoration-gray-300 underline-offset-4 hover:decoration-gray-900 dark:text-gray-100 dark:decoration-gray-700 dark:hover:decoration-gray-100" :title="ticket.subject">{{ ticket.key }}</Link>
+                </p>
             </article>
 
             <!-- The section polls for changes and reports the thread's own live state (lock, pin, reactions, message) back up. -->
@@ -105,6 +111,8 @@ function deleteThread() {
                 :can-reply="post.can.reply && !isGone"
                 :is-locked="post.is_locked"
                 :reaction-types="reactionTypes"
+                :accepted-reply-id="post.accepted_reply_id"
+                :can-accept-answer="can.acceptAnswer && !isGone"
                 live
                 :synced-at="syncedAt"
                 @totals="repliesCount = $event.replies_count"

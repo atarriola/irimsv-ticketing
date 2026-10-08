@@ -17,9 +17,12 @@ const search = ref('');
 const location = computed(() => new URL(page.url, 'http://localhost'));
 const startsWith = (path) => location.value.pathname === path || location.value.pathname.startsWith(`${path}/`);
 
+// "My tickets" is the list narrowed to the user's own; it is its own entry rather than a group.
+const isMyTickets = computed(() => startsWith('/tickets') && location.value.searchParams.get('mine') === '1');
+
 // The tickets page reports the group it is showing; a single ticket's pages are filed under the group its type belongs to.
 const currentTicketGroup = computed(() => {
-    if (!startsWith('/tickets')) {
+    if (!startsWith('/tickets') || isMyTickets.value) {
         return null;
     }
 
@@ -30,6 +33,7 @@ const currentTicketGroup = computed(() => {
 
 // Each entry is a group on the tickets page, so "current" follows the group whether it is shown as a board or a list.
 const ticketGroups = computed(() => [
+    { label: 'My tickets', href: '/tickets?view=list&group=all&mine=1', icon: 'user', isCurrent: isMyTickets.value },
     { label: 'All tickets', href: '/tickets?view=list&group=all', icon: 'list', isCurrent: currentTicketGroup.value === 'all' },
     { label: 'Tickets', href: '/tickets', icon: 'ticket', isCurrent: currentTicketGroup.value === 'issues' },
     { label: 'Feature requests', href: '/tickets?group=feature_requests', icon: 'lightbulb', isCurrent: currentTicketGroup.value === 'feature_requests' },
@@ -52,6 +56,7 @@ const sections = computed(() => [
                   items: [
                       { label: 'Users', href: '/admin/users', icon: 'users', isCurrent: startsWith('/admin/users') },
                       { label: 'Categories', href: '/admin/categories', icon: 'tag', isCurrent: startsWith('/admin/categories') },
+                      { label: 'Saved replies', href: '/admin/saved-replies', icon: 'chat', isCurrent: startsWith('/admin/saved-replies') },
                       { label: 'Forum topics', href: '/admin/forum-topics', icon: 'topics', isCurrent: startsWith('/admin/forum-topics') },
                   ],
               },

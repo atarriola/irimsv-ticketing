@@ -9,6 +9,7 @@ defineProps({
     types: Array,
     priorities: Array,
     categories: Array,
+    canSetPriority: Boolean,
     ticket: Object,
 });
 </script>
@@ -30,6 +31,7 @@ defineProps({
             :types="types"
             :priorities="priorities"
             :categories="categories"
+            :can-set-priority="canSetPriority"
             :ticket="ticket"
         />
     </div>

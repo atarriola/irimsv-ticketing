@@ -1,6 +1,7 @@
 <script setup>
-import { Link, useHttp } from '@inertiajs/vue3';
+import { Link, router, useHttp } from '@inertiajs/vue3';
 import { computed, ref, watch } from 'vue';
+import AppIcon from '@/Components/AppIcon.vue';
 import CommentBox from '@/Components/CommentBox.vue';
 import ReactionBar from '@/Components/ReactionBar.vue';
 import UserAvatar from '@/Components/UserAvatar.vue';
@@ -11,7 +12,14 @@ const props = defineProps({
     canReply: Boolean,
     reactionTypes: { type: Array, required: true },
     isNested: Boolean,
+    // Whether this comment is the thread's accepted answer, and whether the viewer may mark one.
+    isAccepted: Boolean,
+    canAcceptAnswer: Boolean,
 });
+
+function toggleAnswer() {
+    router.patch(`/forum/threads/${props.threadId}/answer`, { reply_id: props.isAccepted ? null : props.comment.id }, { preserveScroll: true });
+}
 
 // "created" and "deleted" hand the server's response to the section that owns the conversation; "reply" asks the parent comment to open its reply box.
 const emit = defineEmits(['created', 'deleted', 'reply']);
@@ -73,11 +81,15 @@ function deleteComment() {
         <UserAvatar :name="comment.author" :photo-url="comment.author_photo_url" :is-admin="comment.author_is_admin" small />
 
         <div class="flex min-w-0 flex-1 flex-col gap-1">
-            <div class="w-fit max-w-full rounded-2xl bg-gray-100 px-3.5 py-2 dark:bg-gray-800">
+            <div class="w-fit max-w-full rounded-2xl px-3.5 py-2" :class="isAccepted ? 'border border-green-300 bg-green-50 dark:border-green-400/30 dark:bg-green-500/10' : 'bg-gray-100 dark:bg-gray-800'">
                 <span class="flex flex-wrap items-center gap-2 text-sm font-semibold">
                     {{ comment.author }}
                     <span class="text-xs font-normal text-gray-500 dark:text-gray-400">{{ comment.author_position }}</span>
                     <span v-if="comment.author_is_admin" class="rounded bg-gray-100 px-1.5 py-0.5 text-xs font-medium text-gray-700 dark:bg-gray-800 dark:text-gray-300">Admin</span>
+                    <span v-if="isAccepted" class="flex items-center gap-1 rounded bg-green-100 px-1.5 py-0.5 text-xs font-medium text-green-800 dark:bg-green-500/20 dark:text-green-300">
+                        <AppIcon name="check" class="size-3" />
+                        Accepted answer
+                    </span>
                 </span>
                 <p class="text-sm leading-relaxed break-words whitespace-pre-line text-gray-800 dark:text-gray-200">{{ comment.body }}</p>
             </div>
@@ -86,6 +98,7 @@ function deleteComment() {
                 <span>{{ comment.created_at }}</span>
                 <ReactionBar :url="`/forum/replies/${comment.id}/reactions`" :reactions="comment.reactions" :types="reactionTypes" compact />
                 <button v-if="canReply" type="button" :class="linkClasses" @click="startReply">Reply</button>
+                <button v-if="canAcceptAnswer && !isNested" type="button" :class="linkClasses" @click="toggleAnswer">{{ isAccepted ? 'Unmark answer' : 'Mark as answer' }}</button>
                 <Link v-if="comment.can.update" :href="`/forum/replies/${comment.id}/edit`" :class="linkClasses">Edit</Link>
                 <button v-if="comment.can.delete" type="button" :disabled="http.processing" class="cursor-pointer font-semibold text-gray-600 hover:text-red-600 hover:underline dark:text-gray-400 dark:hover:text-red-400" @click="deleteComment">
                     Delete
