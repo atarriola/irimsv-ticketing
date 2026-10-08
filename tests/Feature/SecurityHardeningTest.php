@@ -18,6 +18,41 @@ test('responses carry the browser security headers', function () {
         ->assertHeaderMissing('Strict-Transport-Security');
 });
 
+test('responses carry a content security policy with a nonce for the page scripts', function () {
+    config()->set('helpdesk.csp.mode', 'enforce');
+    config()->set('helpdesk.csp.photo_url', 'https://lrmis.test/some/path');
+    config()->set('helpdesk.csp.reverb_host', 'ws.lrmis.test');
+    config()->set('helpdesk.csp.reverb_port', '443');
+    config()->set('helpdesk.csp.reverb_scheme', 'https');
+
+    $response = $this->get(route('login'))->assertOk();
+    $policy = $response->headers->get('Content-Security-Policy');
+
+    expect($policy)->toContain("default-src 'self'")
+        ->toContain("frame-ancestors 'none'")
+        ->toMatch("/script-src 'self' 'nonce-[A-Za-z0-9]+'/")
+        ->toContain("img-src 'self' data: blob: https://lrmis.test")
+        ->toContain('connect-src \'self\' wss://ws.lrmis.test:443');
+
+    preg_match("/'nonce-([A-Za-z0-9]+)'/", $policy, $matches);
+    expect($response->getContent())->toContain('nonce="'.$matches[1].'"');
+});
+
+test('the content security policy can be switched to report-only or off', function (string $mode, ?string $header) {
+    config()->set('helpdesk.csp.mode', $mode);
+
+    $response = $this->get(route('login'))->assertOk();
+
+    if ($header === null) {
+        $response->assertHeaderMissing('Content-Security-Policy')->assertHeaderMissing('Content-Security-Policy-Report-Only');
+    } else {
+        expect($response->headers->has($header))->toBeTrue();
+    }
+})->with([
+    'report' => ['report', 'Content-Security-Policy-Report-Only'],
+    'off' => ['off', null],
+]);
+
 test('strict transport security is only sent over https', function () {
     $this->get('https://localhost/')
         ->assertHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');

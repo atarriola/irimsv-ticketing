@@ -49,8 +49,8 @@ test('a message cannot be empty', function () {
     expect(TicketComment::count())->toBe(0);
 });
 
-test('a member can join the conversation on a ticket raised by someone else', function () {
-    $ticket = Ticket::factory()->create();
+test('a member can join the conversation on a shared ticket raised by someone else', function () {
+    $ticket = Ticket::factory()->shared()->create();
     $member = User::factory()->create();
 
     $this->actingAs($member)
@@ -116,8 +116,8 @@ test('an open page learns that the ticket was closed and messages are no longer 
         ->assertJsonPath('can_comment', false);
 });
 
-test('a member can read the conversation on a ticket raised by someone else', function () {
-    $ticket = Ticket::factory()->create();
+test('a member can read the conversation on a shared ticket raised by someone else', function () {
+    $ticket = Ticket::factory()->shared()->create();
     $comment = TicketComment::factory()->for($ticket)->create();
 
     $this->actingAs(User::factory()->create())

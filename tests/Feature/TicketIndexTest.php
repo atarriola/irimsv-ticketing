@@ -74,11 +74,11 @@ test('an unknown group falls back to bugs and problems', function () {
         ->assertInertia(fn (Assert $page) => $page->where('group', 'issues'));
 });
 
-test('a member sees and counts tickets from every user', function () {
+test('a member sees and counts their own tickets and the shared ones from every user', function () {
     $user = User::factory()->create();
     $ownTicket = Ticket::factory()->for($user, 'requester')->create(['type' => TicketType::Problem]);
-    Ticket::factory(2)->create(['type' => TicketType::BugReport]);
-    Ticket::factory()->featureRequest()->create();
+    Ticket::factory(2)->shared()->create(['type' => TicketType::BugReport]);
+    Ticket::factory()->shared()->featureRequest()->create();
 
     $this->actingAs($user)
         ->get(route('tickets.index', ['view' => 'list']))

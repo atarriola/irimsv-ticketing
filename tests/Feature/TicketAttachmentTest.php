@@ -43,13 +43,21 @@ test('an image attached to a ticket can be opened by :viewer', function (string 
         ->assertHeader('Content-Disposition', 'inline; filename=error.png');
 })->with(['the requester', 'an admin']);
 
-test('a member can open an image attached to somebody else\'s ticket', function () {
-    $attachment = attachImage(Ticket::factory()->create());
+test('a member can open an image attached to somebody else\'s shared ticket', function () {
+    $attachment = attachImage(Ticket::factory()->shared()->create());
 
     $this->actingAs(User::factory()->create())
         ->get(route('tickets.attachments.show', [$attachment->ticket_id, $attachment]))
         ->assertOk()
         ->assertHeader('Content-Type', 'image/png');
+});
+
+test('a member cannot open an image attached to somebody else\'s private ticket', function () {
+    $attachment = attachImage(Ticket::factory()->create());
+
+    $this->actingAs(User::factory()->create())
+        ->get(route('tickets.attachments.show', [$attachment->ticket_id, $attachment]))
+        ->assertForbidden();
 });
 
 test('an attachment is only found under its own ticket', function () {
@@ -113,12 +121,17 @@ test('an image cannot be removed by :who', function (string $who) {
     Storage::disk(TicketAttachment::DISK)->assertExists($attachment->path);
 })->with(['someone who did not raise the ticket', 'the requester once the ticket is closed']);
 
-test('deleting a ticket removes its image files', function () {
+test('deleting a ticket keeps its image files until the ticket is removed for good', function () {
     $ticket = Ticket::factory()->create();
     $first = attachImage($ticket, 'one.png');
     $second = attachImage($ticket, 'two.png');
 
     $this->actingAs(User::factory()->admin()->create())->delete(route('tickets.destroy', $ticket));
+
+    expect(TicketAttachment::count())->toBe(2);
+    Storage::disk(TicketAttachment::DISK)->assertExists([$first->path, $second->path]);
+
+    $ticket->fresh()->forceDelete();
 
     expect(TicketAttachment::count())->toBe(0);
     Storage::disk(TicketAttachment::DISK)->assertMissing([$first->path, $second->path]);

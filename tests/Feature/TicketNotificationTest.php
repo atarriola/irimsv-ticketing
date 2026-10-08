@@ -11,7 +11,7 @@ uses(RefreshDatabase::class);
 test('a message from :role notifies the ticket requester but not the person who wrote it', function (string $role) {
     Notification::fake();
     $requester = User::factory()->create();
-    $ticket = Ticket::factory()->for($requester, 'requester')->create();
+    $ticket = Ticket::factory()->for($requester, 'requester')->shared()->create();
     $writer = $role === 'an admin' ? User::factory()->admin()->create() : User::factory()->create();
 
     $this->actingAs($writer)

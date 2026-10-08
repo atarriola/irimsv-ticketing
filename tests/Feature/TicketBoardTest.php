@@ -59,7 +59,7 @@ test('the board only holds the tickets of the chosen group, whoever raised them'
     $user = User::factory()->create();
     Ticket::factory()->for($user, 'requester')->featureRequest()->create();
     Ticket::factory()->for($user, 'requester')->create(['type' => TicketType::BugReport]);
-    Ticket::factory()->featureRequest()->create();
+    Ticket::factory()->shared()->featureRequest()->create();
 
     $this->actingAs($user)
         ->get(route('tickets.index', ['group' => 'feature_requests']))
@@ -115,8 +115,8 @@ test('a search term is treated as text, not as a pattern', function () {
         ->assertInertia(fn (Assert $page) => $page->has('tickets.data', 0));
 });
 
-test('searching finds tickets raised by someone else', function () {
-    $ticket = Ticket::factory()->create(['type' => TicketType::BugReport, 'subject' => 'Payroll page is slow']);
+test('searching finds shared tickets raised by someone else', function () {
+    $ticket = Ticket::factory()->shared()->create(['type' => TicketType::BugReport, 'subject' => 'Payroll page is slow']);
 
     $this->actingAs(User::factory()->create())
         ->get(route('tickets.index', ['view' => 'list', 'q' => 'payroll']))

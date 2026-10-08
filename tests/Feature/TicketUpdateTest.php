@@ -85,9 +85,9 @@ test('a requester can open the edit form for their open ticket', function () {
             ->has('priorities', 4));
 });
 
-test('a requester can update the details of their open ticket', function () {
+test('a requester can update the details of their open ticket, but not its priority or status', function () {
     $requester = User::factory()->create();
-    $ticket = Ticket::factory()->for($requester, 'requester')->create(['type' => TicketType::BugReport]);
+    $ticket = Ticket::factory()->for($requester, 'requester')->create(['type' => TicketType::BugReport, 'priority' => TicketPriority::Low]);
 
     $response = $this->actingAs($requester)->put(route('tickets.update', $ticket), [
         'type' => 'feature_request',
@@ -102,9 +102,10 @@ test('a requester can update the details of their open ticket', function () {
     $ticket->refresh();
 
     expect($ticket->type)->toBe(TicketType::FeatureRequest);
-    expect($ticket->priority)->toBe(TicketPriority::Critical);
+    expect($ticket->priority)->toBe(TicketPriority::Low);
     expect($ticket->subject)->toBe('New subject');
     expect($ticket->status)->toBe(TicketStatus::Open);
+    expect($ticket->events()->sole()->details)->toBe(['fields' => ['type', 'subject', 'description']]);
 });
 
 test('updating a ticket validates its details', function () {
@@ -145,7 +146,7 @@ test('a user cannot edit a ticket raised by someone else', function (string $met
     'submission' => ['put', 'tickets.update'],
 ]);
 
-test('an admin can delete a ticket and its comments go with it', function () {
+test('an admin can delete a ticket, which keeps its conversation so it can be restored', function () {
     $ticket = Ticket::factory()->featureRequest()->create();
     TicketComment::factory(2)->for($ticket)->create();
 
@@ -153,7 +154,8 @@ test('an admin can delete a ticket and its comments go with it', function () {
 
     $response->assertRedirect(route('tickets.index', ['group' => 'feature_requests']));
     expect(Ticket::count())->toBe(0);
-    expect(TicketComment::count())->toBe(0);
+    expect(Ticket::withTrashed()->count())->toBe(1);
+    expect(TicketComment::count())->toBe(2);
 });
 
 test('a requester cannot delete their own ticket', function () {

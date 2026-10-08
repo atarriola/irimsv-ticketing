@@ -54,6 +54,20 @@ test('a link works only once', function () {
     $this->assertGuest();
 });
 
+test('a link that would stay valid for too long is refused, however it was signed', function () {
+    config(['helpdesk.sso.max_lifetime' => 900]);
+    $user = User::factory()->create();
+
+    $this->post(route('sso'), ['token' => ssoToken($user, ['exp' => time() + 3600])])
+        ->assertRedirect(route('login'))
+        ->assertSessionHasErrors('username');
+    $this->assertGuest();
+
+    $this->post(route('sso'), ['token' => ssoToken($user, ['exp' => time() + 600])])
+        ->assertRedirect(route('dashboard'));
+    $this->assertAuthenticatedAs($user);
+});
+
 test('an expired link is refused', function () {
     $user = User::factory()->create();
 

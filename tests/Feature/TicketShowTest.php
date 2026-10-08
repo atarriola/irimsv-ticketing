@@ -77,8 +77,8 @@ test('an admin can open any ticket and may manage it', function () {
             ->where('can.delete', true));
 });
 
-test('a member can open a ticket raised by someone else but may only comment on it', function () {
-    $ticket = Ticket::factory()->create();
+test('a member can open a shared ticket raised by someone else but may only comment on it', function () {
+    $ticket = Ticket::factory()->shared()->create();
 
     $this->actingAs(User::factory()->create())
         ->get(route('tickets.show', $ticket))
@@ -113,5 +113,5 @@ test('the ticket list can be narrowed to one status', function () {
             ->where('filters.status', 'resolved')
             ->has('tickets.data', 1)
             ->where('tickets.data.0.id', $resolved->id)
-            ->where('groups.1.count', 2));
+            ->where('groups.1.count', 1));
 });
