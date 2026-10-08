@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 
 /**
- * Signs in a user arriving from iRIMS-V's "Help Desk" link, which POSTs the token.
+ * Signs in a user arriving from iRIMS-V's "Support Center" link, which POSTs the token.
  *
  * iRIMS-V and the helpdesk share the users table, so iRIMS-V only has to vouch
  * for which account is signed in. It does that with a token of the form
@@ -23,7 +23,7 @@ use Illuminate\Support\Facades\Cache;
  */
 class SingleSignOnController extends Controller
 {
-    private const string FAILED = 'Your sign-in link from iRIMS-V has expired or is invalid. Open the Help Desk from iRIMS-V again, or sign in below.';
+    private const string FAILED = 'Your sign-in link from iRIMS-V has expired or is invalid. Open the Support Center from iRIMS-V again, or sign in below.';
 
     public function __invoke(Request $request): RedirectResponse
     {
@@ -90,13 +90,16 @@ class SingleSignOnController extends Controller
 
         $payload = json_decode((string) $this->base64UrlDecode($encodedPayload), true);
 
+        // A token that would stay valid for longer than iRIMS-V ever issues one is refused too,
+        // whatever signed it: a leaked secret must not mint long-lived sign-in links.
         if (! is_array($payload)
             || ($payload['v'] ?? null) !== 1
             || ! is_string($payload['uid'] ?? null)
             || ! is_int($payload['exp'] ?? null)
             || ! is_string($payload['nonce'] ?? null)
             || strlen($payload['nonce']) < 32
-            || $payload['exp'] < time()) {
+            || $payload['exp'] < time()
+            || $payload['exp'] > time() + (int) config('helpdesk.sso.max_lifetime')) {
             return null;
         }
 

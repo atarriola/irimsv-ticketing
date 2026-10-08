@@ -1,58 +1,82 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# iRIMS-V Ticketing System
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+The help desk for LRMIS users: tickets for bugs, problems and feature requests, a news feed for announcements and maintenance notices, and a community forum. It is a Laravel 13 application with an Inertia 3 and Vue 3 front end, styled with Tailwind 4.
 
-## About Laravel
+The app lives **inside the LRMIS database**. It authenticates against the LRMIS `users` table and never changes LRMIS data beyond an account's password or an administrator's own details. Anyone whose LRMIS user type is *Administrator* (level 0) administers the help desk; everyone else is a member.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## Requirements
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+- PHP 8.4 with the `pdo_pgsql` extension, Composer
+- Node 20+ and npm
+- PostgreSQL with the LRMIS database (the `lrmis` schema)
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+## Setting up
 
-## Learning Laravel
-
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
-
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
-
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
-
-```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+```sh
+composer install
+cp .env.example .env
+php artisan key:generate
+npm install
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+Then edit `.env`:
 
-## Contributing
+| Setting | Why |
+| --- | --- |
+| `DB_*` | The LRMIS PostgreSQL database. `DB_SEARCH_PATH=lrmis` is required: the help desk tables are created beside the LRMIS tables, and the `users` table is read from there. |
+| `LRMIS_URL` | Where LRMIS serves profile photos from. Leave empty to use this app's own host. |
+| `HELPDESK_ADMIN_*` | The administrator account `php artisan db:seed` creates when LRMIS has no account with that username yet. |
+| `HELPDESK_SSO_SECRET` | Shared with iRIMS-V so its *Support Center* link signs people in. Leave empty to turn single sign-on off. |
+| `REVERB_*` and `VITE_REVERB_*` | The WebSocket server for live updates. Without them the pages fall back to polling. |
+| `HELPDESK_EMAIL_NOTIFICATIONS` and `MAIL_*` | Off by default: people are only told in the app. Once you have a mail account, point `MAIL_*` at it, set `HELPDESK_EMAIL_NOTIFICATIONS=true` and run a queue worker, since emails go through the queue. |
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+Create the tables and the seeded administrator, then build the front end:
 
-## Code of Conduct
+```sh
+php artisan migrate
+php artisan db:seed
+npm run build
+```
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+Migrations never drop the LRMIS tables; the `users` and `usertypes` tables are only created when they are absent, as on the test database.
 
-## Security Vulnerabilities
+## Running it
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+For development, this starts the PHP server, the queue worker, the log tail and Vite together:
 
-## License
+```sh
+composer run dev
+```
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+In production, run `php artisan optimize`, build the assets with `npm run build`, and keep these processes alive beside the web server:
+
+| Process | What it does |
+| --- | --- |
+| `php artisan queue:work` | Sends the ticket emails. Only needed once email notifications are turned on. |
+| `php artisan reverb:start` | The WebSocket server for live updates. The web server must proxy `/app` to it. |
+| `php artisan schedule:run` every minute (cron) | Closes tickets nobody reopened, prunes old notifications, and removes tickets deleted more than 30 days ago. |
+
+## Administration
+
+- `php artisan helpdesk:grant-admin {username}` moves an LRMIS account onto the Administrator user type so that it administers the help desk. `--revoke="Teacher"` moves it back. This changes the account's LRMIS user type too.
+- `php artisan tickets:close-resolved` closes the tickets that have stayed resolved for `HELPDESK_AUTO_CLOSE_DAYS` days (7 by default).
+- `php artisan notifications:prune` removes notifications read more than `HELPDESK_PRUNE_NOTIFICATIONS_AFTER_DAYS` days ago (90 by default).
+
+Other knobs in `config/helpdesk.php`: how long a requester may reopen a resolved ticket (`HELPDESK_REOPEN_WINDOW_DAYS`), how long a maintenance notice stays on the dashboard, the Content Security Policy mode (`HELPDESK_CSP=enforce|report|off`), and the longest single sign-on token accepted.
+
+## How tickets work
+
+- A ticket is private to the person who raised it and the administrators unless the requester shares it with everyone. Shared tickets can be followed, and other people can say they have the same problem (or, for a feature request, that they want it too).
+- Bugs and problems move through *Open*, *In progress*, *Resolved* and *Closed*. Feature requests move through *Open*, *Under review*, *Planned*, *In progress*, *Shipped* and *Closed*, and can be linked to the news post about the release that delivered them.
+- The requester chooses a priority when raising a ticket; afterwards only the help desk changes it.
+- Every ticket shows whose turn it is: it waits on the help desk until an administrator replies, then on the requester. Resolved tickets wait for the requester to confirm the fix or reopen the ticket; after a week they close on their own.
+- Administrators can leave internal notes the requester never sees, insert saved replies, change several tickets at once from the list, export the list as CSV, and restore a deleted ticket for 30 days.
+- The requester, the followers and the help desk are told in the app, and by email if they want, when a ticket is raised, replied to, or moved to another status.
+
+## Tests
+
+```sh
+php artisan test --compact
+```
+
+The suite runs on an in-memory SQLite database and needs no LRMIS data.

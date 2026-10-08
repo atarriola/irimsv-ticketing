@@ -8,7 +8,7 @@
         <link rel="alternate icon" href="/favicon.ico" sizes="any">
 
         {{-- Apply the saved (or system) theme before first paint so the page never flashes the wrong colours. --}}
-        <script>
+        <script nonce="{{ Illuminate\Support\Facades\Vite::cspNonce() }}">
             (function () {
                 let savedTheme = null;
 

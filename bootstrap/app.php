@@ -29,7 +29,7 @@ return Application::configure(basePath: dirname(__DIR__))
             AddSecurityHeaders::class,
         ]);
 
-        // iRIMS-V's Help Desk link posts here from another origin, so it cannot
+        // iRIMS-V's Support Center link posts here from another origin, so it cannot
         // carry this app's CSRF token; the signed, single-use SSO token it does
         // carry is the proof instead (see SingleSignOnController).
         $middleware->validateCsrfTokens(except: ['sso']);
