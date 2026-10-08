@@ -9,6 +9,8 @@ use App\Notifications\ForumThreadCommented;
 use App\Notifications\ForumThreadReacted;
 use App\Notifications\ForumThreadStarted;
 use App\Notifications\TicketCommented;
+use App\Notifications\TicketRaised;
+use App\Notifications\TicketStatusChanged;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Notifications\DatabaseNotification;
@@ -34,7 +36,7 @@ class NotificationResource extends JsonResource
                 ForumCommentReplied::class => 'reply',
                 ForumThreadStarted::class => 'thread',
                 ForumThreadReacted::class, ForumCommentReacted::class => 'reaction',
-                TicketCommented::class => 'ticket',
+                TicketCommented::class, TicketRaised::class, TicketStatusChanged::class => 'ticket',
                 default => 'other',
             },
             'message' => match ($this->type) {
@@ -43,7 +45,9 @@ class NotificationResource extends JsonResource
                 ForumThreadStarted::class => "{$data['actor']} started a thread",
                 ForumThreadReacted::class => $this->reactedMessage($data, 'thread'),
                 ForumCommentReacted::class => $this->reactedMessage($data, 'comment'),
-                TicketCommented::class => "{$data['actor']} commented on your {$data['ticket_type']} {$data['ticket_key']}",
+                TicketCommented::class => "{$data['actor']} commented on {$this->whoseTicket($data)}",
+                TicketRaised::class => "{$data['actor']} raised a {$data['ticket_type']} {$data['ticket_key']}",
+                TicketStatusChanged::class => ($data['actor'] ?? 'The helpdesk')." marked {$this->whoseTicket($data)} as {$data['status_label']}",
                 default => 'You have a new notification',
             },
             'excerpt' => $data['excerpt'] ?? null,
@@ -55,6 +59,18 @@ class NotificationResource extends JsonResource
             'is_read' => $this->read_at !== null,
             'created_at' => $this->created_at->shortAbsoluteDiffForHumans(),
         ];
+    }
+
+    /**
+     * Name the ticket as the recipient relates to it: "your bug report TKT-1" when they raised it, "bug report TKT-1" otherwise.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function whoseTicket(array $data): string
+    {
+        $whose = ($data['is_requester'] ?? true) ? 'your ' : '';
+
+        return "{$whose}{$data['ticket_type']} {$data['ticket_key']}";
     }
 
     /**

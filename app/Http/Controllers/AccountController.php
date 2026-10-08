@@ -12,7 +12,7 @@ use Inertia\Response;
 class AccountController extends Controller
 {
     /**
-     * Display the signed-in user's LRMIS account details.
+     * Display the signed-in user's LRMIS account details and helpdesk settings.
      */
     public function show(Request $request): Response
     {
@@ -26,6 +26,11 @@ class AccountController extends Controller
                 'contact_number' => $user->contact_number,
                 'position' => $user->usertype->type_name,
                 'status' => $user->status->label(),
+            ],
+            'preferences' => [
+                'email_enabled' => (bool) config('helpdesk.email_notifications'),
+                'email_notifications' => $user->preferences()->value('email_notifications') ?? true,
+                'has_email' => trim((string) $user->email) !== '',
             ],
             'can' => [
                 'update' => $request->user()->can('update', $user),
