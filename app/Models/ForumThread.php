@@ -68,7 +68,7 @@ class ForumThread extends Model
         // Recording activity after a reply is left out, because the reply announces itself.
         static::created(fn (ForumThread $thread) => ForumThreadPosted::announce($thread->id));
         static::updated(function (ForumThread $thread): void {
-            if ($thread->wasChanged(['forum_topic_id', 'type', 'body', 'is_pinned', 'is_locked'])) {
+            if ($thread->wasChanged(['forum_topic_id', 'type', 'body', 'is_pinned', 'is_locked', 'accepted_reply_id'])) {
                 ForumThreadChanged::announce($thread->id);
             }
         });
@@ -118,6 +118,26 @@ class ForumThread extends Model
     public function author(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id');
+    }
+
+    /**
+     * Get the comment marked as the answer to the thread, if any.
+     *
+     * @return BelongsTo<ForumReply, $this>
+     */
+    public function acceptedReply(): BelongsTo
+    {
+        return $this->belongsTo(ForumReply::class, 'accepted_reply_id');
+    }
+
+    /**
+     * Get the tickets raised from the thread.
+     *
+     * @return HasMany<Ticket, $this>
+     */
+    public function tickets(): HasMany
+    {
+        return $this->hasMany(Ticket::class)->oldest('id');
     }
 
     /**

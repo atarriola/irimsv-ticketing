@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\ForumThread;
+use App\Models\Ticket;
 use App\Models\User;
 use Illuminate\Support\Facades\Broadcast;
 
@@ -12,3 +13,6 @@ Broadcast::channel('forum', fn (User $user): bool => $user->can('viewAny', Forum
 
 // Live updates for one thread's conversation: anyone allowed to read the thread may follow it.
 Broadcast::channel('forum.thread.{thread}', fn (User $user, ForumThread $thread): bool => $user->can('view', $thread));
+
+// Live updates for one ticket: anyone allowed to read the ticket may follow it.
+Broadcast::channel('ticket.{ticket}', fn (User $user, Ticket $ticket): bool => $user->can('view', $ticket));

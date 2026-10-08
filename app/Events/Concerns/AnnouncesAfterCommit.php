@@ -13,8 +13,8 @@ trait AnnouncesAfterCommit
      * milliseconds. Failing to reach the WebSocket server is reported and otherwise ignored: the request must still
      * succeed, and the pages resync on their own.
      */
-    public static function announce(int $threadId): void
+    public static function announce(int $id): void
     {
-        DB::afterCommit(fn () => rescue(fn () => static::dispatch($threadId)));
+        DB::afterCommit(fn () => rescue(fn () => static::dispatch($id)));
     }
 }

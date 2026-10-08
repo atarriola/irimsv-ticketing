@@ -25,12 +25,23 @@ class TicketFactory extends Factory
         return [
             'user_id' => User::factory(),
             'category_id' => Category::factory(),
-            'type' => fake()->randomElement(TicketType::cases()),
+            // A bug report by default: the statuses a ticket moves through depend on its type, so tests pick another type on purpose.
+            'type' => TicketType::BugReport,
             'priority' => fake()->randomElement(TicketPriority::cases()),
             'status' => TicketStatus::Open,
             'subject' => fake()->sentence(6),
             'description' => fake()->paragraphs(2, true),
         ];
+    }
+
+    /**
+     * Indicate that the requester shared the ticket with everyone.
+     */
+    public function shared(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'is_shared' => true,
+        ]);
     }
 
     /**

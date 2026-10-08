@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['user_id', 'path', 'name', 'mime_type', 'size'])]
+#[Fillable(['user_id', 'ticket_comment_id', 'path', 'name', 'mime_type', 'size'])]
 class TicketAttachment extends Model
 {
     /** @use HasFactory<TicketAttachmentFactory> */
@@ -23,7 +23,7 @@ class TicketAttachment extends Model
     public const string DISK = 'local';
 
     /**
-     * The most images one ticket can carry.
+     * The most images one ticket can carry, not counting the ones sent with messages.
      */
     public const int MAX_PER_TICKET = 5;
 
@@ -52,6 +52,16 @@ class TicketAttachment extends Model
     public function ticket(): BelongsTo
     {
         return $this->belongsTo(Ticket::class);
+    }
+
+    /**
+     * Get the message the file was sent with, when it was not sent with the ticket itself.
+     *
+     * @return BelongsTo<TicketComment, $this>
+     */
+    public function comment(): BelongsTo
+    {
+        return $this->belongsTo(TicketComment::class, 'ticket_comment_id');
     }
 
     /**

@@ -12,7 +12,9 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\Storage;
@@ -22,7 +24,8 @@ use Illuminate\Support\Str;
  * An LRMIS account. The users table belongs to LRMIS; the ticketing system only
  * changes an account's password, an administrator's own details, or its user
  * type through the grant-admin command. Accounts of the LRMIS Administrator
- * type administer the helpdesk and every other account is a member.
+ * type administer the helpdesk and every other account is a member. Anything
+ * the helpdesk itself needs to remember about an account lives in its preferences.
  */
 #[Fillable(['firstname', 'middlename', 'lastname', 'extension_name', 'email', 'contact_number', 'password'])]
 #[Hidden(['password', 'remember_token'])]
@@ -123,6 +126,20 @@ class User extends Authenticatable
     }
 
     /**
+     * Determine whether the user wants an email as well as the bell for what happens to their tickets.
+     *
+     * Everyone does until they turn it off, and nobody without an address can.
+     */
+    public function wantsEmailNotifications(): bool
+    {
+        if (trim((string) $this->email) === '') {
+            return false;
+        }
+
+        return $this->preferences()->value('email_notifications') ?? true;
+    }
+
+    /**
      * Scope the query to the helpdesk administrators.
      *
      * @param  Builder<User>  $query
@@ -164,6 +181,16 @@ class User extends Authenticatable
     }
 
     /**
+     * Get the helpdesk's own settings for the account, if any have been saved.
+     *
+     * @return HasOne<UserPreference, $this>
+     */
+    public function preferences(): HasOne
+    {
+        return $this->hasOne(UserPreference::class);
+    }
+
+    /**
      * Get the tickets raised by the user.
      *
      * @return HasMany<Ticket, $this>
@@ -171,6 +198,26 @@ class User extends Authenticatable
     public function tickets(): HasMany
     {
         return $this->hasMany(Ticket::class);
+    }
+
+    /**
+     * Get the tickets the user follows without having raised them.
+     *
+     * @return BelongsToMany<Ticket, $this>
+     */
+    public function watchedTickets(): BelongsToMany
+    {
+        return $this->belongsToMany(Ticket::class, 'ticket_watchers')->using(TicketWatcher::class)->withPivot('is_affected')->withTimestamps();
+    }
+
+    /**
+     * Get the saved replies the administrator wrote.
+     *
+     * @return HasMany<SavedReply, $this>
+     */
+    public function savedReplies(): HasMany
+    {
+        return $this->hasMany(SavedReply::class);
     }
 
     /**
