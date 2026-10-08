@@ -4,6 +4,7 @@ namespace App\Http\Resources;
 
 use App\Models\ForumReply;
 use App\Models\ForumThread;
+use App\Models\Ticket;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -32,6 +33,7 @@ class ForumThreadResource extends JsonResource
             'replies_count' => $this->replies_count,
             'is_pinned' => $this->is_pinned,
             'is_locked' => $this->is_locked,
+            'accepted_reply_id' => $this->accepted_reply_id,
             // Changes whenever the thread is edited, moderated or replied to; the feed compares it to spot activity without a socket.
             'version' => max($this->updated_at, $this->last_activity_at)->timestamp,
             'created_at' => $this->created_at->diffForHumans(),
@@ -39,6 +41,15 @@ class ForumThreadResource extends JsonResource
             'reactions' => $this->whenLoaded('reactions', fn (): array => $this->reactionSummary($request->user())),
             'preview_comments' => $this->whenLoaded('previewComments', fn (): array => $this->previewComments
                 ->map(fn (ForumReply $comment): array => ForumReplyResource::make($comment)->resolve($request))
+                ->all()),
+            // The tickets raised out of the thread, when the page asked for them.
+            'tickets' => $this->whenLoaded('tickets', fn (): array => $this->tickets
+                ->map(fn (Ticket $ticket): array => [
+                    'id' => $ticket->id,
+                    'key' => $ticket->key,
+                    'subject' => $ticket->subject,
+                    'url' => route('tickets.show', $ticket),
+                ])
                 ->all()),
             'can' => [
                 'reply' => $request->user()->can('reply', $this->resource),

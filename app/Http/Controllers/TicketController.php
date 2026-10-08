@@ -2,26 +2,37 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\NewsKind;
+use App\Enums\TicketEventKind;
 use App\Enums\TicketGroup;
 use App\Enums\TicketPriority;
+use App\Enums\TicketSort;
 use App\Enums\TicketStatus;
 use App\Enums\TicketType;
+use App\Enums\WaitingOn;
 use App\Http\Requests\StoreTicketRequest;
+use App\Http\Requests\TicketListRequest;
 use App\Http\Requests\UpdateTicketRequest;
 use App\Http\Resources\TicketAttachmentResource;
 use App\Http\Resources\TicketCommentResource;
+use App\Http\Resources\TicketEventResource;
 use App\Http\Resources\TicketResource;
 use App\Models\Category;
+use App\Models\ForumThread;
+use App\Models\NewsPost;
+use App\Models\SavedReply;
 use App\Models\Ticket;
 use App\Models\TicketAttachment;
 use App\Models\TicketComment;
+use App\Models\TicketEvent;
 use App\Models\User;
+use App\Notifications\TicketRaised;
 use BackedEnum;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -35,58 +46,53 @@ class TicketController extends Controller
     /**
      * Display the tickets of one group as a board or a list.
      */
-    public function index(Request $request): Response
+    public function index(TicketListRequest $request): Response
     {
-        Gate::authorize('viewAny', Ticket::class);
-
         $user = $request->user();
-        $group = $request->enum('group', TicketGroup::class) ?? TicketGroup::Issues;
-        $status = $request->enum('status', TicketStatus::class);
-        $priority = $request->enum('priority', TicketPriority::class);
-        $search = Str::limit(trim((string) $request->string('q')), 100, '');
-        $view = $request->query('view') === 'list' ? 'list' : 'board';
+        $group = $request->group();
+        $view = $request->view();
 
+        // A board shows every status as a column, so a status filter only applies to the list.
         $tickets = Ticket::query()
-            ->whereIn('type', $group->types())
-            ->when($priority, fn (Builder $query) => $query->where('priority', $priority))
-            ->when($search !== '', fn (Builder $query) => $query->search($search))
+            ->visibleTo($user)
+            ->filtered($request->filters(withStatus: $view === 'list'), $user)
             ->with(['requester:'.User::DISPLAY_COLUMNS, 'category:id,name'])
-            ->withCount('comments');
+            ->withCount(['supporters', 'comments' => fn (Builder $query) => $query->visibleTo($user)]);
 
         return Inertia::render('Tickets/Index', [
             'view' => $view,
             'group' => $group->value,
-            'groups' => $this->groupCounts(),
-            'filters' => [
-                'q' => $search,
-                'status' => $status?->value,
-                'priority' => $priority?->value,
-            ],
-            'statuses' => $this->options(TicketStatus::cases()),
+            'groups' => $this->groupCounts($user),
+            'filters' => $request->filtersForPage(),
+            'statuses' => $this->options(TicketStatus::forGroup($group)),
             'priorities' => $this->options(array_reverse(TicketPriority::cases())),
-            'columns' => $view === 'board' ? $this->boardColumns($tickets, $request) : null,
+            'categories' => Category::orderBy('name')->get(['id', 'name']),
+            'waitingOptions' => $this->options(WaitingOn::cases()),
+            'sorts' => $this->options(TicketSort::cases()),
+            'columns' => $view === 'board' ? $this->boardColumns($tickets, $group, $request) : null,
             'tickets' => $view === 'list'
                 ? $tickets
-                    ->when($status, fn (Builder $query) => $query->where('status', $status))
-                    ->latest()
-                    ->latest('id')
+                    ->sortedBy($request->sort())
                     ->paginate(20)
                     ->withQueryString()
                     ->through(fn (Ticket $ticket): array => TicketResource::make($ticket)->resolve($request))
                 : null,
             'can' => [
                 'moveCards' => $user->isAdmin(),
+                'bulkUpdate' => $user->isAdmin(),
+                'export' => $user->can('export', Ticket::class),
+                'viewTrashed' => $user->isAdmin(),
             ],
         ]);
     }
 
     /**
-     * Build one board column per status with its most urgent tickets.
+     * Build one board column per status of the group with its most urgent, most recently active tickets.
      *
      * @param  Builder<Ticket>  $tickets
      * @return list<array{status: string, label: string, total: int, tickets: list<array<string, mixed>>}>
      */
-    private function boardColumns(Builder $tickets, Request $request): array
+    private function boardColumns(Builder $tickets, TicketGroup $group, Request $request): array
     {
         $totals = (clone $tickets)->toBase()
             ->reorder()
@@ -102,36 +108,51 @@ class TicketController extends Controller
             'tickets' => (clone $tickets)
                 ->where('status', $status)
                 ->mostUrgentFirst()
-                ->latest('updated_at')
-                ->latest('id')
+                ->mostRecentlyActive()
                 ->limit(self::CARDS_PER_COLUMN)
                 ->get()
                 ->map(fn (Ticket $ticket): array => TicketResource::make($ticket)->resolve($request))
                 ->all(),
-        ], TicketStatus::cases());
+        ], TicketStatus::forGroup($group));
     }
 
     /**
-     * Display the form for raising a ticket.
+     * Display the form for raising a ticket, prefilled from a forum thread when raised out of one.
      */
     public function create(Request $request): Response
     {
         Gate::authorize('create', Ticket::class);
 
+        $thread = $request->integer('thread') > 0 ? ForumThread::find($request->integer('thread')) : null;
+
+        if ($thread !== null && ! $request->user()->can('raiseTicket', $thread)) {
+            $thread = null;
+        }
+
         return Inertia::render('Tickets/Create', [
             ...$this->formOptions(),
             'defaultType' => ($request->enum('type', TicketType::class) ?? TicketType::BugReport)->value,
+            'canSetPriority' => true,
+            'thread' => $thread === null ? null : [
+                'id' => $thread->id,
+                'excerpt' => $thread->excerpt,
+                'body' => $thread->body,
+            ],
+            'maintenanceNotice' => $this->maintenanceNotice(),
         ]);
     }
 
     /**
-     * Raise a new ticket for the signed-in user.
+     * Raise a new ticket for the signed-in user and tell the helpdesk about it.
      */
     public function store(StoreTicketRequest $request): RedirectResponse
     {
-        $ticket = $request->user()->tickets()->create($request->safe()->except('attachments'));
+        $user = $request->user();
+        $ticket = $user->tickets()->create($request->ticketAttributes());
 
         $this->attachImages($ticket, $request);
+        $ticket->recordEvent(TicketEventKind::Created, $user);
+        $this->notifyAdministrators($ticket, $user);
 
         Inertia::flash('toast', ['type' => 'success', 'message' => "{$ticket->key} has been created."]);
 
@@ -139,21 +160,46 @@ class TicketController extends Controller
     }
 
     /**
-     * Display a ticket with its conversation.
+     * Tell the helpdesk administrators about the new ticket, except the one who raised it.
+     *
+     * A failure to notify one of them is reported and never stops the ticket from being raised.
+     */
+    private function notifyAdministrators(Ticket $ticket, User $requester): void
+    {
+        $ticket->setRelation('requester', $requester);
+
+        User::administrators()
+            ->whereKeyNot($requester->getKey())
+            ->get()
+            ->each(fn (User $administrator) => rescue(fn () => $administrator->notify(new TicketRaised($ticket))));
+    }
+
+    /**
+     * Display a ticket with its conversation and timeline.
      */
     public function show(Request $request, Ticket $ticket): Response
     {
         Gate::authorize('view', $ticket);
 
         $user = $request->user();
-        $ticket->load(['requester:'.User::DISPLAY_COLUMNS.',email', 'category:id,name', 'attachments']);
+        $ticket->load(['requester:'.User::DISPLAY_COLUMNS.',email', 'category:id,name', 'screenshots', 'newsPost:id,title', 'forumThread:id,body'])
+            ->loadCount('supporters');
 
         $comments = $ticket->comments()
-            ->with('author:'.User::DISPLAY_COLUMNS)
+            ->visibleTo($user)
+            ->with(['author:'.User::DISPLAY_COLUMNS, 'attachments'])
             ->oldest()
             ->oldest('id')
             ->get()
+            ->each(fn (TicketComment $comment) => $comment->setRelation('ticket', $ticket))
             ->map(fn (TicketComment $comment): array => TicketCommentResource::make($comment)->resolve($request));
+
+        $timeline = $ticket->events()
+            ->with('user:'.User::DISPLAY_COLUMNS)
+            ->get()
+            ->map(fn (TicketEvent $event): array => TicketEventResource::make($event)->resolve($request));
+
+        $following = $ticket->watchers()->whereKey($user->getKey())->first()?->pivot;
 
         return Inertia::render('Tickets/Show', [
             'ticket' => [
@@ -165,22 +211,60 @@ class TicketController extends Controller
                 'type_key' => $ticket->type->value,
                 'group' => TicketGroup::forType($ticket->type)->value,
                 'status' => $ticket->status->value,
+                'status_label' => $ticket->status->label(),
                 'priority' => $ticket->priority->value,
+                'waiting_on' => $ticket->waiting_on?->value,
+                'waiting_label' => $ticket->waiting_on?->label(),
+                'is_shared' => $ticket->is_shared,
+                'is_deleted' => $ticket->trashed(),
+                'is_mine' => $ticket->user_id === $user->id,
+                'awaiting_confirmation' => $ticket->isAwaitingConfirmation(),
+                'rating' => $ticket->rating,
+                'rating_comment' => $ticket->rating_comment,
+                'supporters_count' => $ticket->supporters_count,
+                'is_watching' => $following !== null,
+                'is_affected' => (bool) ($following?->is_affected ?? false),
                 'category' => $ticket->category?->name,
                 'requester' => $ticket->requester->only(['name', 'position', 'email', 'photo_url']),
+                'release_post' => $ticket->newsPost === null ? null : [
+                    'id' => $ticket->newsPost->id,
+                    'title' => $ticket->newsPost->title,
+                    'url' => route('news.show', $ticket->newsPost),
+                ],
+                'forum_thread' => $ticket->forumThread === null ? null : [
+                    'id' => $ticket->forumThread->id,
+                    'excerpt' => $ticket->forumThread->excerpt,
+                    'url' => route('forum.threads.show', $ticket->forumThread),
+                ],
                 'created_at' => $ticket->created_at->toDayDateTimeString(),
-                'updated_at' => $ticket->updated_at->diffForHumans(),
+                'updated_at' => $ticket->last_activity_at?->diffForHumans() ?? $ticket->updated_at->diffForHumans(),
                 'resolved_at' => $ticket->resolved_at?->toDayDateTimeString(),
                 'closed_at' => $ticket->closed_at?->toDayDateTimeString(),
+                'deleted_at' => $ticket->deleted_at?->toDayDateTimeString(),
                 'attachments' => $this->attachmentsFor($ticket, $request),
             ],
             'comments' => $comments,
-            'statuses' => $this->options(TicketStatus::cases()),
+            'timeline' => $timeline,
+            'statuses' => $this->options(TicketStatus::forType($ticket->type)),
+            'priorities' => $this->options(TicketPriority::cases()),
+            'releasePosts' => $user->can('linkRelease', $ticket)
+                ? NewsPost::published()->where('kind', NewsKind::Release)->newestFirst()->get(['id', 'title'])
+                : [],
+            'savedReplies' => $user->can('viewAny', SavedReply::class)
+                ? SavedReply::orderBy('title')->get(['id', 'title', 'body'])
+                : [],
             'can' => [
                 'update' => $user->can('update', $ticket),
                 'delete' => $user->can('delete', $ticket),
+                'restore' => $user->can('restore', $ticket),
                 'changeStatus' => $user->can('changeStatus', $ticket),
+                'changePriority' => $user->can('changePriority', $ticket),
+                'confirmResolution' => $user->can('confirmResolution', $ticket),
                 'comment' => $user->can('comment', $ticket),
+                'addInternalNote' => $user->can('addInternalNote', $ticket),
+                'watch' => $user->can('watch', $ticket),
+                'rate' => $user->can('rate', $ticket),
+                'linkRelease' => $user->can('linkRelease', $ticket),
             ],
         ]);
     }
@@ -192,10 +276,11 @@ class TicketController extends Controller
     {
         Gate::authorize('update', $ticket);
 
-        $ticket->load('attachments');
+        $ticket->load('screenshots');
 
         return Inertia::render('Tickets/Edit', [
             ...$this->formOptions(),
+            'canSetPriority' => $request->user()->can('changePriority', $ticket),
             'ticket' => [
                 'id' => $ticket->id,
                 'key' => $ticket->key,
@@ -204,17 +289,33 @@ class TicketController extends Controller
                 'category_id' => $ticket->category_id,
                 'subject' => $ticket->subject,
                 'description' => $ticket->description,
+                'is_shared' => $ticket->is_shared,
                 'attachments' => $this->attachmentsFor($ticket, $request),
             ],
         ]);
     }
 
     /**
-     * Update a ticket's details, adding any images sent along.
+     * Update a ticket's details, adding any images sent along, and note what changed.
      */
     public function update(UpdateTicketRequest $request, Ticket $ticket): RedirectResponse
     {
-        $ticket->update($request->safe()->except('attachments'));
+        $user = $request->user();
+        $attributes = $request->ticketAttributes();
+        $priority = Arr::pull($attributes, 'priority');
+
+        $ticket->fill($attributes);
+        $changed = array_keys($ticket->getDirty());
+
+        if ($changed !== []) {
+            $ticket->last_activity_at = now();
+            $ticket->save();
+            $ticket->recordEvent(TicketEventKind::Edited, $user, ['fields' => $changed]);
+        }
+
+        if ($priority !== null) {
+            $ticket->changePriority(TicketPriority::from($priority), $user);
+        }
 
         $this->attachImages($ticket, $request);
 
@@ -224,16 +325,17 @@ class TicketController extends Controller
     }
 
     /**
-     * Delete a ticket together with its comments.
+     * Delete a ticket. It keeps its conversation and can be restored by an administrator for a while.
      */
-    public function destroy(Ticket $ticket): RedirectResponse
+    public function destroy(Request $request, Ticket $ticket): RedirectResponse
     {
         Gate::authorize('delete', $ticket);
 
         $group = TicketGroup::forType($ticket->type);
+        $ticket->recordEvent(TicketEventKind::Deleted, $request->user());
         $ticket->delete();
 
-        Inertia::flash('toast', ['type' => 'success', 'message' => "{$ticket->key} has been deleted."]);
+        Inertia::flash('toast', ['type' => 'success', 'message' => "{$ticket->key} has been deleted. It can be restored for ".Ticket::DAYS_KEPT_AFTER_DELETION.' days.']);
 
         return redirect()->route('tickets.index', ['group' => $group->value]);
     }
@@ -249,13 +351,13 @@ class TicketController extends Controller
     }
 
     /**
-     * Describe the ticket's images for the client.
+     * Describe the ticket's own images for the client.
      *
      * @return list<array<string, mixed>>
      */
     private function attachmentsFor(Ticket $ticket, Request $request): array
     {
-        return $ticket->attachments
+        return $ticket->screenshots
             ->map(fn (TicketAttachment $attachment): array => TicketAttachmentResource::make($attachment)->resolve($request))
             ->all();
     }
@@ -275,6 +377,27 @@ class TicketController extends Controller
     }
 
     /**
+     * Get the maintenance notice to show above the form, if one went out recently.
+     *
+     * @return array{id: int, title: string, excerpt: string, url: string}|null
+     */
+    private function maintenanceNotice(): ?array
+    {
+        $post = NewsPost::published()
+            ->where('kind', NewsKind::Maintenance)
+            ->where('published_at', '>=', now()->subDays((int) config('helpdesk.maintenance_notice_days')))
+            ->newestFirst()
+            ->first(['id', 'title', 'body', 'published_at']);
+
+        return $post === null ? null : [
+            'id' => $post->id,
+            'title' => $post->title,
+            'excerpt' => $post->excerpt,
+            'url' => route('news.show', $post),
+        ];
+    }
+
+    /**
      * Turn enum cases into value and label pairs for the client.
      *
      * @param  list<BackedEnum>  $cases
@@ -286,13 +409,15 @@ class TicketController extends Controller
     }
 
     /**
-     * Count the tickets in each group.
+     * Count the active tickets the user may see in each group.
      *
      * @return list<array{key: string, label: string, count: int}>
      */
-    private function groupCounts(): array
+    private function groupCounts(User $user): array
     {
         $totals = Ticket::query()
+            ->visibleTo($user)
+            ->active()
             ->toBase()
             ->select('type')
             ->selectRaw('count(*) as total')

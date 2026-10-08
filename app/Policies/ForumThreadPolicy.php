@@ -63,4 +63,20 @@ class ForumThreadPolicy
     {
         return $user->isAdmin() || ! $forumThread->is_locked;
     }
+
+    /**
+     * Determine whether the user can mark a comment as the thread's answer: the person who asked, or an administrator.
+     */
+    public function acceptAnswer(User $user, ForumThread $forumThread): bool
+    {
+        return $user->isAdmin() || $forumThread->user_id === $user->id;
+    }
+
+    /**
+     * Determine whether the user can raise a ticket out of the thread: the person who started it, or an administrator.
+     */
+    public function raiseTicket(User $user, ForumThread $forumThread): bool
+    {
+        return $user->isAdmin() || $forumThread->user_id === $user->id;
+    }
 }

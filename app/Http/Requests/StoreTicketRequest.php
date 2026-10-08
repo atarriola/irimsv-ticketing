@@ -5,6 +5,7 @@ namespace App\Http\Requests;
 use App\Enums\TicketPriority;
 use App\Enums\TicketType;
 use App\Models\Category;
+use App\Models\ForumThread;
 use App\Models\Ticket;
 use App\Models\TicketAttachment;
 use Illuminate\Contracts\Validation\ValidationRule;
@@ -34,6 +35,8 @@ class StoreTicketRequest extends FormRequest
             'category_id' => ['nullable', 'integer', Rule::exists(Category::class, 'id')],
             'subject' => ['required', 'string', 'max:255'],
             'description' => ['required', 'string', 'max:5000'],
+            'is_shared' => ['nullable', 'boolean'],
+            'forum_thread_id' => ['nullable', 'integer', Rule::exists(ForumThread::class, 'id')],
             'attachments' => ['nullable', 'array', 'max:'.TicketAttachment::MAX_PER_TICKET],
             'attachments.*' => ['required', 'image', 'mimes:jpg,jpeg,png,gif,webp', 'max:'.TicketAttachment::MAX_KILOBYTES],
         ];
@@ -65,6 +68,19 @@ class StoreTicketRequest extends FormRequest
             'attachments.*.image' => 'Each attachment must be a JPG, PNG, GIF or WebP image.',
             'attachments.*.mimes' => 'Each attachment must be a JPG, PNG, GIF or WebP image.',
             'attachments.*.max' => 'Each image must be '.(TicketAttachment::MAX_KILOBYTES / 1024).' MB or smaller.',
+        ];
+    }
+
+    /**
+     * Get the validated ticket details, without the images, with the share flag always present.
+     *
+     * @return array<string, mixed>
+     */
+    public function ticketAttributes(): array
+    {
+        return [
+            ...$this->safe()->except(['attachments', 'is_shared']),
+            'is_shared' => $this->boolean('is_shared'),
         ];
     }
 }

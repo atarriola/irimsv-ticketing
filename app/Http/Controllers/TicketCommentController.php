@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreTicketCommentRequest;
+use App\Http\Requests\UpdateTicketCommentRequest;
 use App\Http\Resources\TicketCommentResource;
 use App\Models\Ticket;
 use App\Models\TicketComment;
@@ -11,6 +12,7 @@ use App\Notifications\TicketCommented;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 
 class TicketCommentController extends Controller
@@ -23,11 +25,13 @@ class TicketCommentController extends Controller
         Gate::authorize('view', $ticket);
 
         $comments = $ticket->comments()
-            ->with('author:'.User::DISPLAY_COLUMNS)
+            ->visibleTo($request->user())
+            ->with(['author:'.User::DISPLAY_COLUMNS, 'attachments'])
             ->when($request->integer('after') > 0, fn (Builder $query) => $query->where('id', '>', $request->integer('after')))
             ->oldest()
             ->oldest('id')
-            ->get();
+            ->get()
+            ->each(fn (TicketComment $comment) => $comment->setRelation('ticket', $ticket));
 
         return response()->json([
             'data' => $comments->map(fn (TicketComment $comment): array => TicketCommentResource::make($comment)->resolve($request)),
@@ -36,38 +40,69 @@ class TicketCommentController extends Controller
     }
 
     /**
-     * Post a message in a ticket's conversation and return it.
+     * Post a message, or an internal note, in a ticket's conversation and return it.
      */
     public function store(StoreTicketCommentRequest $request, Ticket $ticket): JsonResponse
     {
-        $comment = $ticket->comments()->create([
-            'user_id' => $request->user()->id,
-            'body' => $request->validated('body'),
-        ]);
+        $user = $request->user();
 
-        $comment->load('author:'.User::DISPLAY_COLUMNS);
+        $comment = DB::transaction(function () use ($request, $ticket, $user): TicketComment {
+            $comment = $ticket->comments()->create([
+                'user_id' => $user->id,
+                'body' => $request->validated('body'),
+                'is_internal' => $request->boolean('is_internal'),
+            ]);
 
-        $this->notifyRequester($ticket, $comment);
+            foreach ($request->validated('attachments') ?? [] as $file) {
+                $comment->addAttachment($file, $user);
+            }
+
+            return $comment;
+        });
+
+        $comment->setRelation('ticket', $ticket)->load(['author:'.User::DISPLAY_COLUMNS, 'attachments']);
+
+        if (! $comment->is_internal) {
+            $this->notifyReaders($ticket, $comment);
+        }
 
         return response()->json(['comment' => TicketCommentResource::make($comment)->resolve($request)], 201);
     }
 
     /**
-     * Tell the person who raised the ticket about the message, unless they wrote it themselves.
+     * Tell everyone following the ticket about the message, and the helpdesk when it came from a member.
      *
-     * A failure to notify them is reported without stopping the message from being posted.
+     * The writer is never told about their own message, one person is told once, and a failure
+     * to notify someone is reported without stopping the message from being posted.
      */
-    private function notifyRequester(Ticket $ticket, TicketComment $comment): void
+    private function notifyReaders(Ticket $ticket, TicketComment $comment): void
     {
-        if ($ticket->requester->is($comment->author)) {
-            return;
+        $recipients = $ticket->audience();
+
+        if (! $comment->author->isAdmin()) {
+            $recipients = $recipients->merge(User::administrators()->get());
         }
 
-        rescue(fn () => $ticket->requester->notify(new TicketCommented($ticket, $comment)));
+        $recipients
+            ->unique('id')
+            ->reject(fn (User $recipient): bool => $recipient->is($comment->author))
+            ->each(fn (User $recipient) => rescue(fn () => $recipient->notify(new TicketCommented($ticket, $comment))));
     }
 
     /**
-     * Delete a message.
+     * Change the wording of a message and return it.
+     */
+    public function update(UpdateTicketCommentRequest $request, TicketComment $comment): JsonResponse
+    {
+        $comment->update(['body' => $request->validated('body')]);
+
+        $comment->load(['author:'.User::DISPLAY_COLUMNS, 'attachments']);
+
+        return response()->json(['comment' => TicketCommentResource::make($comment)->resolve($request)]);
+    }
+
+    /**
+     * Delete a message together with its images.
      */
     public function destroy(TicketComment $comment): JsonResponse
     {

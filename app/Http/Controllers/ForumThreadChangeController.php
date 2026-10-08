@@ -62,6 +62,7 @@ class ForumThreadChangeController extends Controller
             'thread' => [
                 'is_pinned' => $thread->is_pinned,
                 'is_locked' => $thread->is_locked,
+                'accepted_reply_id' => $thread->accepted_reply_id,
                 'reactions' => $thread->reactionSummary($request->user()),
                 'can' => ['reply' => $request->user()->can('reply', $thread)],
                 ...($since !== null && $thread->updated_at->gte($since) ? ['body' => $thread->body, 'excerpt' => $thread->excerpt] : []),

@@ -1,9 +1,11 @@
 <?php
 
 use App\Http\Controllers\AccountController;
+use App\Http\Controllers\AccountNotificationController;
 use App\Http\Controllers\AccountPasswordController;
 use App\Http\Controllers\Admin\CategoryController as AdminCategoryController;
 use App\Http\Controllers\Admin\ForumTopicController as AdminForumTopicController;
+use App\Http\Controllers\Admin\SavedReplyController as AdminSavedReplyController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Admin\UserPasswordController as AdminUserPasswordController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
@@ -11,6 +13,7 @@ use App\Http\Controllers\Auth\SingleSignOnController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ForumReplyController;
 use App\Http\Controllers\ForumReplyReactionController;
+use App\Http\Controllers\ForumThreadAnswerController;
 use App\Http\Controllers\ForumThreadChangeController;
 use App\Http\Controllers\ForumThreadController;
 use App\Http\Controllers\ForumThreadModerationController;
@@ -19,10 +22,18 @@ use App\Http\Controllers\NewsAttachmentController;
 use App\Http\Controllers\NewsPostController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\NotificationReadController;
+use App\Http\Controllers\SimilarTicketController;
 use App\Http\Controllers\TicketAttachmentController;
+use App\Http\Controllers\TicketBulkController;
 use App\Http\Controllers\TicketCommentController;
 use App\Http\Controllers\TicketController;
+use App\Http\Controllers\TicketExportController;
+use App\Http\Controllers\TicketPriorityController;
+use App\Http\Controllers\TicketRatingController;
+use App\Http\Controllers\TicketReleaseController;
+use App\Http\Controllers\TicketRestoreController;
 use App\Http\Controllers\TicketStatusController;
+use App\Http\Controllers\TicketWatchController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('guest')->group(function () {
@@ -31,7 +42,7 @@ Route::middleware('guest')->group(function () {
     Route::post('/login', [AuthenticatedSessionController::class, 'store'])->name('login.store');
 });
 
-// Single sign-on from iRIMS-V's Help Desk link, which POSTs a one-time token
+// Single sign-on from iRIMS-V's Support Center link, which POSTs a one-time token
 // (exempt from CSRF in bootstrap/app.php — the signed token is the proof).
 // Outside `guest` on purpose: a different account may already be signed in on
 // this browser, and the link switches to the one iRIMS-V vouches for. A GET
@@ -43,12 +54,24 @@ Route::middleware('auth')->group(function () {
     Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
 
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
-    Route::resource('tickets', TicketController::class)->whereNumber('ticket')->middlewareFor('store', 'throttle:posting');
+
+    Route::get('/tickets/export', TicketExportController::class)->name('tickets.export');
+    Route::get('/tickets/similar', SimilarTicketController::class)->name('tickets.similar');
+    Route::patch('/tickets/bulk', [TicketBulkController::class, 'update'])->name('tickets.bulk.update');
+    // A deleted ticket can still be opened by an administrator, so that it can be restored.
+    Route::resource('tickets', TicketController::class)->whereNumber('ticket')->withTrashed(['show'])->middlewareFor('store', 'throttle:posting');
+    Route::patch('/tickets/{ticket}/restore', [TicketRestoreController::class, 'update'])->whereNumber('ticket')->withTrashed()->name('tickets.restore');
     Route::patch('/tickets/{ticket}/status', [TicketStatusController::class, 'update'])->whereNumber('ticket')->name('tickets.status.update');
+    Route::patch('/tickets/{ticket}/priority', [TicketPriorityController::class, 'update'])->whereNumber('ticket')->name('tickets.priority.update');
+    Route::put('/tickets/{ticket}/watch', [TicketWatchController::class, 'update'])->whereNumber('ticket')->name('tickets.watch.update');
+    Route::delete('/tickets/{ticket}/watch', [TicketWatchController::class, 'destroy'])->whereNumber('ticket')->name('tickets.watch.destroy');
+    Route::put('/tickets/{ticket}/rating', [TicketRatingController::class, 'update'])->whereNumber('ticket')->name('tickets.rating.update');
+    Route::put('/tickets/{ticket}/release', [TicketReleaseController::class, 'update'])->whereNumber('ticket')->name('tickets.release.update');
     Route::get('/tickets/{ticket}/comments', [TicketCommentController::class, 'index'])->whereNumber('ticket')->name('tickets.comments.index');
     Route::post('/tickets/{ticket}/comments', [TicketCommentController::class, 'store'])->whereNumber('ticket')->middleware('throttle:posting')->name('tickets.comments.store');
+    Route::put('/ticket-comments/{comment}', [TicketCommentController::class, 'update'])->whereNumber('comment')->name('ticket-comments.update');
     Route::delete('/ticket-comments/{comment}', [TicketCommentController::class, 'destroy'])->whereNumber('comment')->name('ticket-comments.destroy');
-    Route::get('/tickets/{ticket}/attachments/{attachment}', [TicketAttachmentController::class, 'show'])->whereNumber(['ticket', 'attachment'])->scopeBindings()->name('tickets.attachments.show');
+    Route::get('/tickets/{ticket}/attachments/{attachment}', [TicketAttachmentController::class, 'show'])->whereNumber(['ticket', 'attachment'])->scopeBindings()->withTrashed()->name('tickets.attachments.show');
     Route::delete('/tickets/{ticket}/attachments/{attachment}', [TicketAttachmentController::class, 'destroy'])->whereNumber(['ticket', 'attachment'])->scopeBindings()->name('tickets.attachments.destroy');
 
     Route::resource('news', NewsPostController::class)->parameters(['news' => 'post'])->whereNumber('post');
@@ -59,6 +82,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/account/edit', [AccountController::class, 'edit'])->name('account.edit');
     Route::patch('/account', [AccountController::class, 'update'])->name('account.update');
     Route::put('/account/password', [AccountPasswordController::class, 'update'])->name('account.password.update');
+    Route::put('/account/notifications', [AccountNotificationController::class, 'update'])->name('account.notifications.update');
 
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
     Route::post('/notifications/read', [NotificationReadController::class, 'store'])->name('notifications.read.store');
@@ -70,6 +94,7 @@ Route::middleware('auth')->group(function () {
         Route::put('/users/{user}/password', [AdminUserPasswordController::class, 'update'])->whereUuid('user')->name('users.password.update');
         Route::resource('categories', AdminCategoryController::class)->except('show')->whereNumber('category');
         Route::resource('forum-topics', AdminForumTopicController::class)->except('show')->parameters(['forum-topics' => 'topic']);
+        Route::resource('saved-replies', AdminSavedReplyController::class)->except('show')->parameters(['saved-replies' => 'saved_reply'])->whereNumber('saved_reply');
     });
 
     Route::prefix('forum')->name('forum.')->group(function () {
@@ -81,6 +106,7 @@ Route::middleware('auth')->group(function () {
         Route::delete('/threads/{thread}', [ForumThreadController::class, 'destroy'])->whereNumber('thread')->name('threads.destroy');
 
         Route::patch('/threads/{thread}/moderation', [ForumThreadModerationController::class, 'update'])->whereNumber('thread')->name('threads.moderation.update');
+        Route::patch('/threads/{thread}/answer', [ForumThreadAnswerController::class, 'update'])->whereNumber('thread')->name('threads.answer.update');
         Route::get('/threads/{thread}/changes', [ForumThreadChangeController::class, 'index'])->whereNumber('thread')->name('threads.changes.index');
         Route::post('/threads/{thread}/reactions', [ForumThreadReactionController::class, 'store'])->whereNumber('thread')->middleware('throttle:posting')->name('threads.reactions.store');
         Route::post('/replies/{reply}/reactions', [ForumReplyReactionController::class, 'store'])->whereNumber('reply')->middleware('throttle:posting')->name('replies.reactions.store');

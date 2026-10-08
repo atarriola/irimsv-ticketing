@@ -14,13 +14,15 @@ class TicketCommentResource extends JsonResource
     /**
      * Transform the resource into an array.
      *
-     * @return array{id: int, body: string, author: string, author_position: string, author_photo_url: string|null, author_is_admin: bool, is_mine: bool, sent_at: string, sent_on: string, can: array{delete: bool}}
+     * @return array<string, mixed>
      */
     public function toArray(Request $request): array
     {
         return [
             'id' => $this->id,
             'body' => $this->body,
+            'is_internal' => $this->is_internal,
+            'is_edited' => $this->isEdited(),
             'author' => $this->author->name,
             'author_position' => $this->author->position,
             'author_photo_url' => $this->author->photo_url,
@@ -28,7 +30,9 @@ class TicketCommentResource extends JsonResource
             'is_mine' => $this->user_id === $request->user()->id,
             'sent_at' => $this->created_at->format('g:i A'),
             'sent_on' => $this->created_at->isToday() ? 'Today' : ($this->created_at->isYesterday() ? 'Yesterday' : $this->created_at->toFormattedDateString()),
+            'attachments' => $this->whenLoaded('attachments', fn (): array => TicketAttachmentResource::collection($this->attachments)->resolve($request)),
             'can' => [
+                'update' => $request->user()->can('update', $this->resource),
                 'delete' => $request->user()->can('delete', $this->resource),
             ],
         ];

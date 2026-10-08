@@ -109,7 +109,7 @@ class ForumThreadController extends Controller
         // Taken before the conversation is read, so the page's first live check picks up any edit made from this moment on.
         $syncedAt = now();
 
-        $thread->load(['topic:id,name,slug', 'author:'.User::DISPLAY_COLUMNS, 'reactions'])->loadCount(['replies', 'comments']);
+        $thread->load(['topic:id,name,slug', 'author:'.User::DISPLAY_COLUMNS, 'reactions', 'tickets:id,forum_thread_id,subject'])->loadCount(['replies', 'comments']);
 
         $comments = $thread->comments()
             ->with(ForumThread::COMMENT_RELATIONS)
@@ -125,6 +125,8 @@ class ForumThreadController extends Controller
                 'moderate' => $request->user()->can('moderate', $thread),
                 'update' => $request->user()->can('update', $thread),
                 'delete' => $request->user()->can('delete', $thread),
+                'acceptAnswer' => $request->user()->can('acceptAnswer', $thread),
+                'raiseTicket' => $request->user()->can('raiseTicket', $thread),
             ],
         ]);
     }

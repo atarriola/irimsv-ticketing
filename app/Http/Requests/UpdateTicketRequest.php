@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Models\TicketAttachment;
+use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Validation\Validator;
 
 class UpdateTicketRequest extends StoreTicketRequest
@@ -13,6 +14,27 @@ class UpdateTicketRequest extends StoreTicketRequest
     public function authorize(): bool
     {
         return $this->user()?->can('update', $this->route('ticket')) ?? false;
+    }
+
+    /**
+     * Get the validation rules that apply to the request.
+     *
+     * The priority is the helpdesk's call once a ticket exists, so a member's edit leaves it alone,
+     * and the forum thread a ticket was raised from cannot be changed afterwards.
+     *
+     * @return array<string, ValidationRule|array<mixed>|string>
+     */
+    public function rules(): array
+    {
+        $rules = parent::rules();
+
+        unset($rules['forum_thread_id']);
+
+        if (! $this->user()->can('changePriority', $this->route('ticket'))) {
+            $rules['priority'] = ['exclude'];
+        }
+
+        return $rules;
     }
 
     /**
@@ -32,7 +54,7 @@ class UpdateTicketRequest extends StoreTicketRequest
                     return;
                 }
 
-                $existing = $this->route('ticket')->attachments()->count();
+                $existing = $this->route('ticket')->screenshots()->count();
 
                 if ($existing + $added > TicketAttachment::MAX_PER_TICKET) {
                     $validator->errors()->add('attachments', sprintf(
